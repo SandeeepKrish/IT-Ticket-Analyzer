@@ -14,7 +14,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
-from ai import draft_reply, has_key_configured
+from ai import draft_reply, has_key_configured, detect_file_type, process_folder_upload, validate_folder_upload, get_folder_upload_summary
 
 load_dotenv()
 
@@ -1128,6 +1128,46 @@ def related_list(df: pd.DataFrame, owner: str, exclude_ticket: str, empty_msg: s
 with st.sidebar:
     st.markdown('<div class="sidebar-header">📂 Upload Ticket Reports</div>', unsafe_allow_html=True)
     
+    # ============ FAST FOLDER UPLOAD (NEW!) ============
+    st.markdown("### ⚡ Fast Folder Upload (New!)")
+    st.caption("Upload a folder containing all 8 Excel files. Files are auto-detected by name and mapped to their categories.")
+    
+    folder_files = st.file_uploader(
+        "📁 Select all Excel files from your folder",
+        type="xlsx",
+        accept_multiple_files=True,
+        key="folder_upload",
+        help="Upload all 8 files at once. Files will be auto-detected by filename (e.g., master_file.xlsx, hold_file.xlsx, etc.)"
+    )
+    
+    if folder_files:
+        folder_result = process_folder_upload(folder_files)
+        is_valid, validation_msg = validate_folder_upload(folder_result)
+        
+        if is_valid:
+            st.success("✅ All 8 files detected and validated!")
+            summary = get_folder_upload_summary(folder_result)
+            st.caption(summary)
+            
+            if st.button("📤 Use Folder Data", key="use_folder_data", use_container_width=True):
+                st.session_state["folder_data_loaded"] = True
+                st.session_state["master_df"] = folder_result["master"]
+                st.session_state["wip_df"] = folder_result["wip"]
+                st.session_state["dev_df"] = folder_result["dev"]
+                st.session_state["wait_df"] = folder_result["wait"]
+                st.session_state["hold_df"] = folder_result["hold"]
+                st.session_state["open_df"] = folder_result["open"]
+                st.session_state["pending_df"] = folder_result["pending"]
+                st.session_state["closed_df"] = folder_result["closed"]
+                st.success("✅ Folder data loaded! Reloading app...")
+                st.rerun()
+        else:
+            st.warning(f"⚠️ {validation_msg}")
+    
+    st.divider()
+    st.markdown("### 📋 Manual Upload (Optional)")
+    st.caption("Or upload files individually below:")
+    
     # Compact upload sections with specific placeholders
     col1, col2 = st.columns(2)
     
@@ -1178,24 +1218,39 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-if not all([master_file, wip_file, dev_file, wait_file, hold_file, open_file, pending_file, closed_file]):
-    st.markdown(f"""
-    <div class="welcome-section">
-        <div class="welcome-title">🚀 Upload Required Files</div>
-        <div class="welcome-text">Please upload all 8 ticket export files in the sidebar to begin comprehensive ticket analysis.</div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.stop()
+# Check if using folder data or manual uploads
+use_folder_data = st.session_state.get("folder_data_loaded", False)
 
-# Load all 8 files including master
-master_df = load_excel(master_file)
-wip_df = load_excel(wip_file)
-dev_df = load_excel(dev_file) 
-wait_df = load_excel(wait_file)
-hold_df = load_excel(hold_file)
-open_df = load_excel(open_file)
-pending_df = load_excel(pending_file)
-closed_df = load_excel(closed_file)
+if use_folder_data:
+    # Load from session state (folder upload)
+    master_df = st.session_state.get("master_df")
+    wip_df = st.session_state.get("wip_df")
+    dev_df = st.session_state.get("dev_df")
+    wait_df = st.session_state.get("wait_df")
+    hold_df = st.session_state.get("hold_df")
+    open_df = st.session_state.get("open_df")
+    pending_df = st.session_state.get("pending_df")
+    closed_df = st.session_state.get("closed_df")
+else:
+    # Load from manual uploads
+    if not all([master_file, wip_file, dev_file, wait_file, hold_file, open_file, pending_file, closed_file]):
+        st.markdown(f"""
+        <div class="welcome-section">
+            <div class="welcome-title">🚀 Upload Required Files</div>
+            <div class="welcome-text">Please upload all 8 ticket export files in the sidebar to begin comprehensive ticket analysis.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
+
+    # Load all 8 files including master
+    master_df = load_excel(master_file)
+    wip_df = load_excel(wip_file)
+    dev_df = load_excel(dev_file) 
+    wait_df = load_excel(wait_file)
+    hold_df = load_excel(hold_file)
+    open_df = load_excel(open_file)
+    pending_df = load_excel(pending_file)
+    closed_df = load_excel(closed_file)
 
 # Validate all files have required columns
 files_to_validate = [
