@@ -92,6 +92,27 @@ st.markdown("""
     .wip-metric { border-left: 3px solid #007bff; }
     .dev-metric { border-left: 3px solid #fd7e14; }
     .wait-metric { border-left: 3px solid #dc3545; }
+    .hold-metric { border-left: 3px solid #6f42c1; }
+    .open-metric { border-left: 3px solid #28a745; }
+    .pending-metric { border-left: 3px solid #ffc107; }
+    .closed-metric { border-left: 3px solid #6c757d; }
+    
+    /* Compact sidebar styling */
+    .sidebar .stFileUploader {
+        margin-bottom: 0.5rem !important;
+    }
+    
+    .sidebar .stFileUploader > div {
+        padding: 0.2rem 0 !important;
+    }
+    
+    .sidebar h4 {
+        margin-bottom: 0.2rem !important;
+        margin-top: 0.5rem !important;
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+        color: #495057 !important;
+    }
     
     /* Status indicators */
     .status-grid {
@@ -344,6 +365,236 @@ st.markdown("""
         font-size: 0.9rem;
         margin-bottom: 0.5rem;
     }
+    /* Workflow diagram styling */
+    .workflow-container {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 2rem;
+        margin: 1.5rem 0;
+    }
+    
+    .workflow-title {
+        text-align: center;
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 2rem;
+    }
+    
+    .workflow-steps {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .workflow-step {
+        display: flex;
+        align-items: center;
+        background: white;
+        border: 2px solid #007bff;
+        border-radius: 8px;
+        padding: 1rem;
+        min-width: 150px;
+    }
+    
+    .step-number {
+        background: #007bff;
+        color: white;
+        border-radius: 50%;
+        width: 25px;
+        height: 25px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        margin-right: 0.8rem;
+        font-size: 0.9rem;
+    }
+    
+    .step-title {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 0.9rem;
+    }
+    
+    .step-desc {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.2rem;
+    }
+    
+    .workflow-arrow {
+        font-size: 1.5rem;
+        color: #007bff;
+        font-weight: bold;
+        margin: 0 0.5rem;
+    }
+    
+    .workflow-branches {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .branch {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 180px;
+    }
+    
+    .branch-arrow {
+        font-size: 1.5rem;
+        color: #fd7e14;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .branch-step {
+        background: white;
+        border: 2px solid #fd7e14;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        width: 100%;
+    }
+    
+    .workflow-final {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .final-arrow {
+        font-size: 1.5rem;
+        color: #28a745;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .final-step {
+        background: white;
+        border: 2px solid #28a745;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        min-width: 200px;
+    }
+    
+    /* Master ticket status styling */
+    .master-status {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        text-align: center;
+    }
+    
+    .status-workflow {
+        background: white;
+        border: 2px solid var(--status-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
+    
+    .status-workflow-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--status-color);
+        margin-bottom: 0.5rem;
+    }
+    
+    .status-workflow-desc {
+        color: #6c757d;
+        margin-bottom: 1rem;
+    }
+    
+    .status-workflow-next {
+        background: var(--status-color);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    /* Date filter results styling */
+    .filter-results {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,123,255,0.3);
+    }
+    
+    .filter-results-count {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .filter-results-label {
+        font-size: 1rem;
+        opacity: 0.9;
+        margin-bottom: 0.25rem;
+    }
+    
+    .filter-results-details {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
+    
+    .monthly-breakdown {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .monthly-breakdown-title {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+    
+    .monthly-breakdown-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    
+    .month-item {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 0.5rem;
+        text-align: center;
+        font-size: 0.85rem;
+    }
+    
+    .month-name {
+        font-weight: 500;
+        color: #495057;
+    }
+    
+    .month-count {
+        font-weight: 600;
+        color: #007bff;
+        font-size: 1rem;
+    }
+    
     /* Welcome section styling */
     .welcome-section {
         background: #f8f9fa;
@@ -370,21 +621,180 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def display_user_statistics(wip_df: pd.DataFrame, dev_df: pd.DataFrame, wait_df: pd.DataFrame, selected_owner: str):
+def display_filter_results(df: pd.DataFrame, category_name: str, owner_filter: str, year_filter: str, month_filter: str, category_color: str):
+    """Display prominent filter results with ticket counts and breakdowns"""
+    
+    # Get filtered data
+    filtered_df = get_filtered_data(df, owner_filter, year_filter, month_filter)
+    total_tickets = len(filtered_df)
+    
+    # Build filter description
+    filter_parts = []
+    if owner_filter != "All owners":
+        filter_parts.append(f"Owner: {owner_filter}")
+    if year_filter != "All Years":
+        filter_parts.append(f"Year: {year_filter}")
+    if month_filter != "All Months":
+        filter_parts.append(f"Month: {month_filter}")
+    
+    filter_description = " | ".join(filter_parts) if filter_parts else "All Tickets"
+    
+    # Display main results
+    st.markdown(f"""
+    <div class="filter-results" style="background: linear-gradient(135deg, {category_color} 0%, {category_color}dd 100%);">
+        <div class="filter-results-count">{total_tickets:,}</div>
+        <div class="filter-results-label">{category_name} Tickets Found</div>
+        <div class="filter-results-details">{filter_description}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Show monthly breakdown if year is selected but not specific month
+    if year_filter != "All Years" and month_filter == "All Months" and total_tickets > 0:
+        display_monthly_breakdown(filtered_df, year_filter, category_name)
+    
+    # Show owner breakdown if month/year selected but not owner
+    if (year_filter != "All Years" or month_filter != "All Months") and owner_filter == "All owners" and total_tickets > 0:
+        display_owner_breakdown(filtered_df, category_name)
+
+
+def display_monthly_breakdown(df: pd.DataFrame, year: str, category_name: str):
+    """Display monthly breakdown for a specific year"""
+    if df.empty or "Start Date" not in df.columns:
+        return
+        
+    df_temp = df.copy()
+    df_temp["Start Date"] = pd.to_datetime(df_temp["Start Date"], errors='coerce')
+    
+    # Group by month
+    monthly_counts = df_temp.groupby(df_temp["Start Date"].dt.month).size()
+    
+    month_names = {
+        1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+        7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"
+    }
+    
+    st.markdown(f"""
+    <div class="monthly-breakdown">
+        <div class="monthly-breakdown-title">📅 Monthly Breakdown for {year}</div>
+        <div class="monthly-breakdown-grid">
+    """, unsafe_allow_html=True)
+    
+    for month_num in range(1, 13):
+        month_name = month_names[month_num]
+        count = monthly_counts.get(month_num, 0)
+        st.markdown(f"""
+            <div class="month-item">
+                <div class="month-name">{month_name}</div>
+                <div class="month-count">{count}</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+
+def display_owner_breakdown(df: pd.DataFrame, category_name: str):
+    """Display top owners breakdown for filtered results"""
+    if df.empty or "Ticket Owner" not in df.columns:
+        return
+        
+    owner_counts = df["Ticket Owner"].value_counts().head(5)
+    
+    if len(owner_counts) > 0:
+        st.markdown("### 👥 Top Owners in Filtered Results")
+        for owner, count in owner_counts.items():
+            percentage = (count / len(df)) * 100
+            st.markdown(f"**{owner}**: {count} tickets ({percentage:.1f}%)")
+
+
+def extract_date_filters(df: pd.DataFrame):
+    """Extract unique years and months from Start Date column for filtering"""
+    if df.empty or "Start Date" not in df.columns:
+        return [], []
+    
+    # Convert Start Date to datetime
+    df_temp = df.copy()
+    df_temp["Start Date"] = pd.to_datetime(df_temp["Start Date"], errors='coerce')
+    
+    # Extract years and months
+    years = sorted(df_temp["Start Date"].dt.year.dropna().unique())
+    months = [
+        "All Months", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ]
+    
+    return years, months
+
+
+def filter_by_date(df: pd.DataFrame, selected_year, selected_month):
+    """Filter dataframe by year and month"""
+    if df.empty or "Start Date" not in df.columns:
+        return df
+    
+    df_filtered = df.copy()
+    df_filtered["Start Date"] = pd.to_datetime(df_filtered["Start Date"], errors='coerce')
+    
+    # Filter by year
+    if selected_year != "All Years":
+        df_filtered = df_filtered[df_filtered["Start Date"].dt.year == selected_year]
+    
+    # Filter by month
+    if selected_month != "All Months":
+        month_num = {
+            "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6,
+            "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12
+        }[selected_month]
+        df_filtered = df_filtered[df_filtered["Start Date"].dt.month == month_num]
+    
+    return df_filtered
+
+
+def get_combined_date_filters(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df):
+    """Get combined years from all dataframes for consistent filtering"""
+    all_years = set()
+    
+    for df in [master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df]:
+        if not df.empty and "Start Date" in df.columns:
+            df_temp = df.copy()
+            df_temp["Start Date"] = pd.to_datetime(df_temp["Start Date"], errors='coerce')
+            years = df_temp["Start Date"].dt.year.dropna().unique()
+            all_years.update(years)
+    
+    sorted_years = ["All Years"] + sorted(list(all_years))
+    months = [
+        "All Months", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ]
+    
+    return sorted_years, months
+
+
+def display_user_statistics(wip_df: pd.DataFrame, dev_df: pd.DataFrame, wait_df: pd.DataFrame, 
+                           hold_df: pd.DataFrame, open_df: pd.DataFrame, pending_df: pd.DataFrame, 
+                           closed_df: pd.DataFrame, selected_owner: str, year_filter=None, month_filter=None):
     """Display statistics for the selected owner with animated counters"""
     if selected_owner == "All owners":
         return
     
-    # Calculate statistics for the selected owner
-    wip_count = len(wip_df[wip_df["Ticket Owner"] == selected_owner])
-    dev_count = len(dev_df[dev_df["Ticket Owner"] == selected_owner])
-    wait_count = len(wait_df[wait_df["Ticket Owner"] == selected_owner])
-    total_count = wip_count + dev_count + wait_count
+    # Calculate statistics for the selected owner across all files with date filtering
+    wip_count = len(filter_by_date(wip_df[wip_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(wip_df[wip_df["Ticket Owner"] == selected_owner])
+    dev_count = len(filter_by_date(dev_df[dev_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(dev_df[dev_df["Ticket Owner"] == selected_owner])
+    wait_count = len(filter_by_date(wait_df[wait_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(wait_df[wait_df["Ticket Owner"] == selected_owner])
+    hold_count = len(filter_by_date(hold_df[hold_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(hold_df[hold_df["Ticket Owner"] == selected_owner])
+    open_count = len(filter_by_date(open_df[open_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(open_df[open_df["Ticket Owner"] == selected_owner])
+    pending_count = len(filter_by_date(pending_df[pending_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(pending_df[pending_df["Ticket Owner"] == selected_owner])
+    closed_count = len(filter_by_date(closed_df[closed_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(closed_df[closed_df["Ticket Owner"] == selected_owner])
+    
+    total_active = wip_count + dev_count + wait_count + hold_count + open_count + pending_count
+    
+    # Display date range info
+    date_info = ""
+    if year_filter and month_filter:
+        date_info = f" ({year_filter if year_filter != 'All Years' else 'All Years'} - {month_filter})"
     
     # Display user statistics with animated counters
     st.markdown(f"""
     <div class="filter-section">
-        <div class="filter-title">📊 {selected_owner}'s Ticket Statistics</div>
+        <div class="filter-title">📊 {selected_owner}'s Ticket Statistics{date_info}</div>
         <div class="user-stats-container">
             <div class="user-stat-card" style="--border-color: #007bff; --number-color: #007bff;">
                 <div class="stat-number animate-count">{wip_count}</div>
@@ -398,20 +808,206 @@ def display_user_statistics(wip_df: pd.DataFrame, dev_df: pd.DataFrame, wait_df:
                 <div class="stat-number animate-count">{wait_count}</div>
                 <div class="stat-label">Awaiting User Info</div>
             </div>
+            <div class="user-stat-card" style="--border-color: #6f42c1; --number-color: #6f42c1;">
+                <div class="stat-number animate-count">{hold_count}</div>
+                <div class="stat-label">Hold</div>
+            </div>
+        </div>
+        <div class="user-stats-container">
             <div class="user-stat-card" style="--border-color: #28a745; --number-color: #28a745;">
-                <div class="stat-number animate-count">{total_count}</div>
-                <div class="stat-label">Total Tickets</div>
+                <div class="stat-number animate-count">{open_count}</div>
+                <div class="stat-label">Open</div>
+            </div>
+            <div class="user-stat-card" style="--border-color: #ffc107; --number-color: #856404;">
+                <div class="stat-number animate-count">{pending_count}</div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="user-stat-card" style="--border-color: #6c757d; --number-color: #6c757d;">
+                <div class="stat-number animate-count">{closed_count}</div>
+                <div class="stat-label">Closed</div>
+            </div>
+            <div class="user-stat-card" style="--border-color: #17a2b8; --number-color: #17a2b8;">
+                <div class="stat-number animate-count">{total_active}</div>
+                <div class="stat-label">Total Active</div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 
-def get_filtered_data(df: pd.DataFrame, owner_filter: str):
-    """Filter dataframe by owner and return the filtered data"""
-    if owner_filter == "All owners":
-        return df
-    return df[df["Ticket Owner"] == owner_filter]
+def get_ticket_workflow_status(ticket_no: str, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, master_df):
+    """Determine ticket's current status in the workflow and return detailed information"""
+    
+    # Check if ticket exists in master list
+    master_match = master_df[master_df["Ticket Number"].str.upper() == ticket_no.upper()]
+    if master_match.empty:
+        return None, "not_in_master", "Ticket not found in Master list"
+    
+    # Check current status across all files
+    status_checks = {
+        "closed": closed_df[closed_df["Ticket Number"].str.upper() == ticket_no.upper()],
+        "wait": wait_df[wait_df["Ticket Number"].str.upper() == ticket_no.upper()],
+        "dev": dev_df[dev_df["Ticket Number"].str.upper() == ticket_no.upper()],
+        "wip": wip_df[wip_df["Ticket Number"].str.upper() == ticket_no.upper()],
+        "hold": hold_df[hold_df["Ticket Number"].str.upper() == ticket_no.upper()],
+        "pending": pending_df[pending_df["Ticket Number"].str.upper() == ticket_no.upper()],
+        "open": open_df[open_df["Ticket Number"].str.upper() == ticket_no.upper()]
+    }
+    
+    # Find current status with priority order
+    current_status = None
+    current_data = None
+    
+    for status, df_match in status_checks.items():
+        if not df_match.empty:
+            current_status = status
+            current_data = df_match.iloc[0]
+            break
+    
+    # Workflow descriptions
+    workflow_info = {
+        "closed": {
+            "title": "🎉 Closed - Resolved",
+            "description": "Ticket has been successfully resolved and closed",
+            "color": "#6c757d",
+            "next_step": "No further action needed"
+        },
+        "wait": {
+            "title": "⚠️ Awaiting User Info",
+            "description": "Solution provided, waiting for your response/confirmation",
+            "color": "#dc3545", 
+            "next_step": "Customer response required"
+        },
+        "dev": {
+            "title": "🔧 Under Development",
+            "description": "New feature/solution is being developed",
+            "color": "#fd7e14",
+            "next_step": "Will move to 'Awaiting User Info' when ready"
+        },
+        "wip": {
+            "title": "📊 Work in Progress", 
+            "description": "Support team is actively working on the ticket",
+            "color": "#007bff",
+            "next_step": "May move to Development, Hold, or Awaiting User Info"
+        },
+        "hold": {
+            "title": "⏸️ On Hold",
+            "description": "Ticket paused - team is researching solution",
+            "color": "#6f42c1",
+            "next_step": "Will resume when solution approach is found"
+        },
+        "pending": {
+            "title": "🟠 Pending",
+            "description": "Change request raised but not yet started by backend team", 
+            "color": "#ffc107",
+            "next_step": "Waiting for backend team to begin work"
+        },
+        "open": {
+            "title": "🟢 Open",
+            "description": "Ticket available for assignment to support team",
+            "color": "#28a745",
+            "next_step": "Will be assigned and move to Work in Progress"
+        }
+    }
+    
+    if current_status:
+        return current_data, current_status, workflow_info[current_status]
+    else:
+        # Ticket in master but not in any status file
+        return master_match.iloc[0], "unknown", {
+            "title": "❓ Status Unknown",
+            "description": "Ticket exists in master list but current status unclear",
+            "color": "#6c757d",
+            "next_step": "Contact support for status clarification"
+        }
+
+
+def display_workflow_diagram():
+    """Display the ticket workflow process"""
+    st.markdown("""
+    <div class="workflow-container">
+        <div class="workflow-title">� Ticket Workflow Process</div>
+        <div class="workflow-steps">
+            <div class="workflow-step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Query Created</div>
+                    <div class="step-desc">Customer creates ticket → Added to Master List</div>
+                </div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">🟢 Open</div>
+                    <div class="step-desc">Available for assignment</div>
+                </div>
+            </div>
+            <div class="workflow-arrow">→</div>
+            <div class="workflow-step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">📊 Work in Progress</div>
+                    <div class="step-desc">Assigned to support team</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="workflow-branches">
+            <div class="branch">
+                <div class="branch-arrow">↓</div>
+                <div class="branch-step">
+                    <div class="step-title">⚠️ Awaiting User Info</div>
+                    <div class="step-desc">Solution provided, waiting for response</div>
+                </div>
+            </div>
+            <div class="branch">
+                <div class="branch-arrow">↓</div>
+                <div class="branch-step">
+                    <div class="step-title">🔧 Under Development</div>
+                    <div class="step-desc">New feature being built</div>
+                </div>
+            </div>
+            <div class="branch">
+                <div class="branch-arrow">↓</div>
+                <div class="branch-step">
+                    <div class="step-title">⏸️ Hold</div>
+                    <div class="step-desc">Researching solution</div>
+                </div>
+            </div>
+            <div class="branch">
+                <div class="branch-arrow">↓</div>
+                <div class="branch-step">
+                    <div class="step-title">🟠 Pending</div>
+                    <div class="step-desc">Backend team not started</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="workflow-final">
+            <div class="final-arrow">↓</div>
+            <div class="final-step">
+                <div class="step-title">🎉 Closed</div>
+                <div class="step-desc">Issue resolved successfully</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def get_filtered_data(df: pd.DataFrame, owner_filter: str, year_filter=None, month_filter=None):
+    """Filter dataframe by owner, year, and month"""
+    filtered_df = df.copy()
+    
+    # Filter by owner
+    if owner_filter != "All owners":
+        filtered_df = filtered_df[filtered_df["Ticket Owner"] == owner_filter]
+    
+    # Filter by date if filters are provided
+    if year_filter is not None and month_filter is not None:
+        filtered_df = filter_by_date(filtered_df, year_filter, month_filter)
+    
+    return filtered_df
 
 
 REQUIRED_COLS = [
@@ -530,16 +1126,36 @@ def related_list(df: pd.DataFrame, owner: str, exclude_ticket: str, empty_msg: s
 
 # ---------------------------------------------------------------- Sidebar
 with st.sidebar:
-    st.markdown('<div class="sidebar-header">📂 Upload Reports</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-header">📂 Upload Ticket Reports</div>', unsafe_allow_html=True)
     
-    st.markdown("### 📊 Work in Progress")
-    wip_file = st.file_uploader("Work in Progress export (.xlsx)", type="xlsx", key="wip")
+    # Compact upload sections with specific placeholders
+    col1, col2 = st.columns(2)
     
-    st.markdown("### 🔧 Under Development")
-    dev_file = st.file_uploader("Under Development export (.xlsx)", type="xlsx", key="dev")
+    with col1:
+        st.markdown("**📋 MASTER**")
+        master_file = st.file_uploader("", type="xlsx", key="master", help="Master ticket list - all tickets")
+        
+        st.markdown("**� WIP**")
+        wip_file = st.file_uploader("", type="xlsx", key="wip", help="Work in Progress tickets")
+        
+        st.markdown("**� DEV**") 
+        dev_file = st.file_uploader("", type="xlsx", key="dev", help="Under Development tickets")
+        
+        st.markdown("**� WAIT**")
+        wait_file = st.file_uploader("", type="xlsx", key="wait", help="Awaiting User Info tickets")
     
-    st.markdown("### ⏳ Awaiting User Info")
-    wait_file = st.file_uploader("Awaiting User Info export (.xlsx)", type="xlsx", key="wait")
+    with col2:
+        st.markdown("**� HOLD**")
+        hold_file = st.file_uploader("", type="xlsx", key="hold", help="Hold tickets")
+        
+        st.markdown("**�🟢 OPEN**")
+        open_file = st.file_uploader("", type="xlsx", key="open", help="Open tickets")
+        
+        st.markdown("**🟠 PENDING**")
+        pending_file = st.file_uploader("", type="xlsx", key="pending", help="Pending tickets")
+        
+        st.markdown("**⚫ CLOSED**")
+        closed_file = st.file_uploader("", type="xlsx", key="closed", help="Closed tickets")
 
     st.divider()
     st.markdown('<div class="sidebar-header">🤖 AI Assistant</div>', unsafe_allow_html=True)
@@ -562,41 +1178,83 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-if not wip_file or not dev_file or not wait_file:
-    st.markdown("""
+if not all([master_file, wip_file, dev_file, wait_file, hold_file, open_file, pending_file, closed_file]):
+    st.markdown(f"""
     <div class="welcome-section">
-        <div class="welcome-title">🚀 Get Started</div>
-        <div class="welcome-text">Upload all three Excel exports in the sidebar to begin tracking your tickets.</div>
+        <div class="welcome-title">🚀 Upload Required Files</div>
+        <div class="welcome-text">Please upload all 8 ticket export files in the sidebar to begin comprehensive ticket analysis.</div>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
 
+# Load all 8 files including master
+master_df = load_excel(master_file)
 wip_df = load_excel(wip_file)
-dev_df = load_excel(dev_file)
+dev_df = load_excel(dev_file) 
 wait_df = load_excel(wait_file)
+hold_df = load_excel(hold_file)
+open_df = load_excel(open_file)
+pending_df = load_excel(pending_file)
+closed_df = load_excel(closed_file)
 
-if not (validate_columns(wip_df, "Work in Progress") and 
-        validate_columns(dev_df, "Under Development") and 
-        validate_columns(wait_df, "Awaiting User Info")):
-    st.stop()
+# Validate all files have required columns
+files_to_validate = [
+    (master_df, "Master Ticket List"),
+    (wip_df, "Work in Progress"),
+    (dev_df, "Under Development"), 
+    (wait_df, "Awaiting User Info"),
+    (hold_df, "Hold"),
+    (open_df, "Open"),
+    (pending_df, "Pending"),
+    (closed_df, "Closed")
+]
 
-# Metrics display
-st.markdown("""
+for df, label in files_to_validate:
+    if not validate_columns(df, label):
+        st.stop()
+
+# Enhanced metrics display for all categories + master
+st.markdown(f"""
 <div class="metric-container">
+    <div class="metric-card" style="border-left: 3px solid #17a2b8;">
+        <div class="metric-value" style="color: #17a2b8;">{len(master_df)}</div>
+        <div class="metric-label">Master List</div>
+    </div>
     <div class="metric-card wip-metric">
-        <div class="metric-value" style="color: #007bff;">{}</div>
+        <div class="metric-value" style="color: #007bff;">{len(wip_df)}</div>
         <div class="metric-label">Work in Progress</div>
     </div>
     <div class="metric-card dev-metric">
-        <div class="metric-value" style="color: #fd7e14;">{}</div>
+        <div class="metric-value" style="color: #fd7e14;">{len(dev_df)}</div>
         <div class="metric-label">Under Development</div>
     </div>
     <div class="metric-card wait-metric">
-        <div class="metric-value" style="color: #dc3545;">{}</div>
+        <div class="metric-value" style="color: #dc3545;">{len(wait_df)}</div>
         <div class="metric-label">Awaiting User Info</div>
     </div>
 </div>
-""".format(len(wip_df), len(dev_df), len(wait_df)), unsafe_allow_html=True)
+<div class="metric-container">
+    <div class="metric-card hold-metric">
+        <div class="metric-value" style="color: #6f42c1;">{len(hold_df)}</div>
+        <div class="metric-label">Hold</div>
+    </div>
+    <div class="metric-card open-metric">
+        <div class="metric-value" style="color: #28a745;">{len(open_df)}</div>
+        <div class="metric-label">Open</div>
+    </div>
+    <div class="metric-card pending-metric">
+        <div class="metric-value" style="color: #ffc107; text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">{len(pending_df)}</div>
+        <div class="metric-label">Pending</div>
+    </div>
+    <div class="metric-card closed-metric">
+        <div class="metric-value" style="color: #6c757d;">{len(closed_df)}</div>
+        <div class="metric-label">Closed</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Get combined date filters for global use
+available_years, available_months = get_combined_date_filters(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df)
 
 st.divider()
 
@@ -607,70 +1265,113 @@ ticket_no = st.text_input("Enter ticket number", placeholder="e.g. CT007948", ke
 st.markdown('</div>', unsafe_allow_html=True)
 
 if ticket_no:
-    wip_match = wip_df[wip_df["Ticket Number"].str.upper() == ticket_no]
-    dev_match = dev_df[dev_df["Ticket Number"].str.upper() == ticket_no]
-    wait_match = wait_df[wait_df["Ticket Number"].str.upper() == ticket_no]
-
-    # Status indicators
-    st.markdown("### 📊 Ticket Status Overview")
+    # Use master ticket system to track workflow
+    ticket_data, current_status, workflow_info = get_ticket_workflow_status(
+        ticket_no, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, master_df
+    )
     
-    wip_found = not wip_match.empty
-    dev_found = not dev_match.empty
-    wait_found = not wait_match.empty
-    
-    st.markdown(f"""
-    <div class="status-grid">
-        <div class="status-card {'status-found' if wip_found else 'status-not-found'}">
-            <h4 style="margin-bottom: 0.5rem;">{'✅' if wip_found else '❌'} Work in Progress</h4>
-            <p style="margin: 0;">{'Ticket Found' if wip_found else 'Not Found'}</p>
-        </div>
-        <div class="status-card {'status-found' if dev_found else 'status-not-found'}">
-            <h4 style="margin-bottom: 0.5rem;">{'✅' if dev_found else '❌'} Under Development</h4>
-            <p style="margin: 0;">{'Ticket Found' if dev_found else 'Not Found'}</p>
-        </div>
-        <div class="status-card {'status-found' if wait_found else 'status-not-found'}">
-            <h4 style="margin-bottom: 0.5rem;">{'✅' if wait_found else '❌'} Awaiting User Info</h4>
-            <p style="margin: 0;">{'Ticket Found' if wait_found else 'Not Found'}</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Primary status determination and display
-    row, bucket = None, None
-    if wait_found:
-        st.info(f"🎯 **Primary Status**: **{ticket_no}** is currently in **Awaiting User Info** - This needs your reply!")
-        row, bucket = wait_match.iloc[0], "wait"
-    elif dev_found:
-        st.info(f"🎯 **Primary Status**: **{ticket_no}** is currently in **Under Development** - Active work ongoing.")
-        row, bucket = dev_match.iloc[0], "dev"
-    elif wip_found:
-        st.info(f"🎯 **Primary Status**: **{ticket_no}** is in **Work in Progress** - Initial phase.")
-        row, bucket = wip_match.iloc[0], "wip"
+    if current_status == "not_in_master":
+        st.error(f'🚫 **Ticket Not Found**: "{ticket_no}" does not exist in the Master Ticket List.')
+        st.info("💡 **Note**: All tickets must first be created in the Master List before appearing in workflow categories.")
     else:
-        st.error(f'🚫 **No Results**: Ticket "{ticket_no}" was not found in any of the three sheets.')
-
-    if row is not None:
-        st.divider()
-        st.markdown("### 🎫 Ticket Details")
-        ticket_card(row)
-
-        owner = row["Ticket Owner"]
-        st.divider()
-        st.markdown(f"### 👤 {owner}'s Other Open Tickets")
+        # Display workflow status
+        if workflow_info:
+            st.markdown(f"""
+            <div class="status-workflow" style="--status-color: {workflow_info['color']};">
+                <div class="status-workflow-title">{workflow_info['title']}</div>
+                <div class="status-workflow-desc">{workflow_info['description']}</div>
+                <div class="status-workflow-next">Next Step: {workflow_info['next_step']}</div>
+            </div>
+            """, unsafe_allow_html=True)
         
-        col1, col2, col3 = st.columns(3)
+        # Show status across all files for transparency
+        wip_match = wip_df[wip_df["Ticket Number"].str.upper() == ticket_no]
+        dev_match = dev_df[dev_df["Ticket Number"].str.upper() == ticket_no]
+        wait_match = wait_df[wait_df["Ticket Number"].str.upper() == ticket_no]
+        hold_match = hold_df[hold_df["Ticket Number"].str.upper() == ticket_no]
+        open_match = open_df[open_df["Ticket Number"].str.upper() == ticket_no]
+        pending_match = pending_df[pending_df["Ticket Number"].str.upper() == ticket_no]
+        closed_match = closed_df[closed_df["Ticket Number"].str.upper() == ticket_no]
+
+        st.markdown("### 📊 Status Tracking Across All Categories")
+        
+        col1, col2 = st.columns(2)
         with col1:
-            related_list(wip_df, owner, row["Ticket Number"], 
-                        "No other tickets in work in progress for this owner.", 
-                        False, "📊 Work in Progress")
+            st.markdown(f"""
+            <div class="status-grid">
+                <div class="status-card {'status-found' if not wip_match.empty else 'status-not-found'}">
+                    <h4 style="margin-bottom: 0.5rem;">{'✅' if not wip_match.empty else '❌'} Work in Progress</h4>
+                    <p style="margin: 0;">{'Found' if not wip_match.empty else 'Not Found'}</p>
+                </div>
+                <div class="status-card {'status-found' if not dev_match.empty else 'status-not-found'}">
+                    <h4 style="margin-bottom: 0.5rem;">{'✅' if not dev_match.empty else '❌'} Under Development</h4>
+                    <p style="margin: 0;">{'Found' if not dev_match.empty else 'Not Found'}</p>
+                </div>
+                <div class="status-card {'status-found' if not wait_match.empty else 'status-not-found'}">
+                    <h4 style="margin-bottom: 0.5rem;">{'✅' if not wait_match.empty else '❌'} Awaiting User Info</h4>
+                    <p style="margin: 0;">{'Found' if not wait_match.empty else 'Not Found'}</p>
+                </div>
+                <div class="status-card {'status-found' if not hold_match.empty else 'status-not-found'}">
+                    <h4 style="margin-bottom: 0.5rem;">{'✅' if not hold_match.empty else '❌'} Hold</h4>
+                    <p style="margin: 0;">{'Found' if not hold_match.empty else 'Not Found'}</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
         with col2:
-            related_list(dev_df, owner, row["Ticket Number"], 
-                        "No other tickets in development for this owner.", 
-                        False, "🔧 Under Development")
-        with col3:
-            related_list(wait_df, owner, row["Ticket Number"], 
-                        "No other tickets awaiting info for this owner.", 
-                        True, "⏳ Waiting on Reply")
+            st.markdown(f"""
+            <div class="status-grid">
+                <div class="status-card {'status-found' if not open_match.empty else 'status-not-found'}">
+                    <h4 style="margin-bottom: 0.5rem;">{'✅' if not open_match.empty else '❌'} Open</h4>
+                    <p style="margin: 0;">{'Found' if not open_match.empty else 'Not Found'}</p>
+                </div>
+                <div class="status-card {'status-found' if not pending_match.empty else 'status-not-found'}">
+                    <h4 style="margin-bottom: 0.5rem;">{'✅' if not pending_match.empty else '❌'} Pending</h4>
+                    <p style="margin: 0;">{'Found' if not pending_match.empty else 'Not Found'}</p>
+                </div>
+                <div class="status-card {'status-found' if not closed_match.empty else 'status-not-found'}">
+                    <h4 style="margin-bottom: 0.5rem;">{'✅' if not closed_match.empty else '❌'} Closed</h4>
+                    <p style="margin: 0;">{'Found' if not closed_match.empty else 'Not Found'}</p>
+                </div>
+                <div class="status-card status-found">
+                    <h4 style="margin-bottom: 0.5rem;">✅ Master List</h4>
+                    <p style="margin: 0;">Found</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        if ticket_data is not None:
+            st.divider()
+            st.markdown(f"### 🎫 Ticket Details - {workflow_info['title'] if workflow_info else 'Details'}")
+            ticket_card(ticket_data)
+
+            owner = ticket_data["Ticket Owner"]
+            st.divider()
+            st.markdown(f"### 👤 {owner}'s Other Active Tickets")
+            
+            # Show related tickets from all active categories (excluding closed)
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                related_list(wip_df, owner, ticket_data["Ticket Number"], 
+                            "No other WIP tickets for this owner.", 
+                            False, "📊 Work in Progress")
+                related_list(hold_df, owner, ticket_data["Ticket Number"],
+                            "No other hold tickets for this owner.",
+                            False, "⏸️ Hold")
+            with col2:
+                related_list(dev_df, owner, ticket_data["Ticket Number"], 
+                            "No other development tickets for this owner.", 
+                            False, "🔧 Under Development")
+                related_list(open_df, owner, ticket_data["Ticket Number"],
+                            "No other open tickets for this owner.",
+                            False, "🟢 Open")
+            with col3:
+                related_list(wait_df, owner, ticket_data["Ticket Number"], 
+                            "No other tickets awaiting info for this owner.", 
+                            True, "⚠️ Awaiting Reply")
+                related_list(pending_df, owner, ticket_data["Ticket Number"],
+                            "No other pending tickets for this owner.",
+                            False, "🟠 Pending")
 
 st.divider()
 
@@ -680,6 +1381,10 @@ all_owners = set()
 all_owners.update(wip_df["Ticket Owner"].dropna().unique())
 all_owners.update(dev_df["Ticket Owner"].dropna().unique())
 all_owners.update(wait_df["Ticket Owner"].dropna().unique())
+all_owners.update(hold_df["Ticket Owner"].dropna().unique())
+all_owners.update(open_df["Ticket Owner"].dropna().unique())
+all_owners.update(pending_df["Ticket Owner"].dropna().unique())
+all_owners.update(closed_df["Ticket Owner"].dropna().unique())
 all_owners_list = ["All owners"] + sorted(list(all_owners))
 
 selected_owner = st.selectbox(
@@ -693,12 +1398,13 @@ if selected_owner != "All owners":
     wip_user_count = len(wip_df[wip_df["Ticket Owner"] == selected_owner])
     dev_user_count = len(dev_df[dev_df["Ticket Owner"] == selected_owner])
     wait_user_count = len(wait_df[wait_df["Ticket Owner"] == selected_owner])
-    total_user_tickets = wip_user_count + dev_user_count + wait_user_count
+    hold_user_count = len(hold_df[hold_df["Ticket Owner"] == selected_owner])
+    open_user_count = len(open_df[open_df["Ticket Owner"] == selected_owner])
+    pending_user_count = len(pending_df[pending_df["Ticket Owner"] == selected_owner])
+    closed_user_count = len(closed_df[closed_df["Ticket Owner"] == selected_owner])
     
-    # Calculate percentages
-    wip_percentage = (wip_user_count / total_user_tickets * 100) if total_user_tickets > 0 else 0
-    dev_percentage = (dev_user_count / total_user_tickets * 100) if total_user_tickets > 0 else 0
-    wait_percentage = (wait_user_count / total_user_tickets * 100) if total_user_tickets > 0 else 0
+    total_active_tickets = wip_user_count + dev_user_count + wait_user_count + hold_user_count + open_user_count + pending_user_count
+    total_all_tickets = total_active_tickets + closed_user_count
     
     st.markdown(f"""
     <div class="filter-section">
@@ -707,78 +1413,249 @@ if selected_owner != "All owners":
             <div class="user-stat-card" style="--border-color: #007bff; --number-color: #007bff;">
                 <div class="stat-number animate-count">{wip_user_count}</div>
                 <div class="stat-label">Work in Progress</div>
-                <div style="font-size: 0.7rem; color: #6c757d; margin-top: 0.2rem;">{wip_percentage:.1f}% of total</div>
             </div>
             <div class="user-stat-card" style="--border-color: #fd7e14; --number-color: #fd7e14;">
                 <div class="stat-number animate-count">{dev_user_count}</div>
                 <div class="stat-label">Under Development</div>
-                <div style="font-size: 0.7rem; color: #6c757d; margin-top: 0.2rem;">{dev_percentage:.1f}% of total</div>
             </div>
             <div class="user-stat-card" style="--border-color: #dc3545; --number-color: #dc3545;">
                 <div class="stat-number animate-count">{wait_user_count}</div>
                 <div class="stat-label">Awaiting User Info</div>
-                <div style="font-size: 0.7rem; color: #6c757d; margin-top: 0.2rem;">{wait_percentage:.1f}% of total</div>
             </div>
+            <div class="user-stat-card" style="--border-color: #6f42c1; --number-color: #6f42c1;">
+                <div class="stat-number animate-count">{hold_user_count}</div>
+                <div class="stat-label">Hold</div>
+            </div>
+        </div>
+        <div class="user-stats-container">
             <div class="user-stat-card" style="--border-color: #28a745; --number-color: #28a745;">
-                <div class="stat-number animate-count">{total_user_tickets}</div>
-                <div class="stat-label">Total Active Tickets</div>
-                <div style="font-size: 0.7rem; color: #6c757d; margin-top: 0.2rem;">100% workload</div>
+                <div class="stat-number animate-count">{open_user_count}</div>
+                <div class="stat-label">Open</div>
+            </div>
+            <div class="user-stat-card" style="--border-color: #ffc107; --number-color: #856404;">
+                <div class="stat-number animate-count">{pending_user_count}</div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="user-stat-card" style="--border-color: #6c757d; --number-color: #6c757d;">
+                <div class="stat-number animate-count">{closed_user_count}</div>
+                <div class="stat-label">Closed</div>
+            </div>
+            <div class="user-stat-card" style="--border-color: #17a2b8; --number-color: #17a2b8;">
+                <div class="stat-number animate-count">{total_active_tickets}</div>
+                <div class="stat-label">Total Active</div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    if total_user_tickets > 0:
-        # Show workload analysis
+    if total_active_tickets > 0:
+        # Enhanced workload analysis
         if wait_user_count > 0:
             st.warning(f"⚠️ **Action Needed**: {selected_owner} has {wait_user_count} ticket(s) awaiting user information that need attention.")
+        if hold_user_count > 0:
+            st.info(f"⏸️ **On Hold**: {selected_owner} has {hold_user_count} ticket(s) on hold - review for potential release.")
         if dev_user_count >= 5:
             st.info(f"💼 **High Workload**: {selected_owner} is actively working on {dev_user_count} tickets in development.")
-        if total_user_tickets >= 10:
-            st.error(f"🚨 **Overloaded**: {selected_owner} has {total_user_tickets} total active tickets - consider redistributing workload.")
+        if total_active_tickets >= 15:
+            st.error(f"🚨 **Overloaded**: {selected_owner} has {total_active_tickets} total active tickets - consider redistributing workload.")
+        if closed_user_count > 0:
+            st.success(f"✅ **Productivity**: {selected_owner} has completed {closed_user_count} ticket(s).")
 
 st.divider()
 
-tab1, tab2, tab3 = st.tabs(["📋 Work in Progress", "📋 Under Development", "📋 Awaiting User Info"])
+tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    "📋 Master List", "📊 Work in Progress", "🔧 Under Development", "⚠️ Awaiting User Info", 
+    "⏸️ Hold", "🟢 Open", "🟠 Pending", "✅ Closed"
+])
 
-with tab1:
-    st.markdown('<div class="owner-filter-container">', unsafe_allow_html=True)
-    st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
-    owners = ["All owners"] + sorted(wip_df["Ticket Owner"].dropna().unique().tolist())
-    wip_owner_filter = st.selectbox("", owners, key="wip_owner_filter", label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
+with tab0:
+    # Filters for Master List
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
+        owners = ["All owners"] + sorted(master_df["Ticket Owner"].dropna().unique().tolist())
+        master_owner_filter = st.selectbox("", owners, key="master_owner_filter", label_visibility="collapsed")
+    with col2:
+        st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
+        master_year_filter = st.selectbox("", available_years, key="master_year_filter", label_visibility="collapsed")
+    with col3:
+        st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
+        master_month_filter = st.selectbox("", available_months, key="master_month_filter", label_visibility="collapsed")
+    
+    # Display prominent filter results
+    display_filter_results(master_df, "Master List", master_owner_filter, master_year_filter, master_month_filter, "#17a2b8")
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, wip_owner_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, master_owner_filter, master_year_filter, master_month_filter)
     
     # Filter and display data
-    wip_view = get_filtered_data(wip_df, wip_owner_filter)
+    master_view = get_filtered_data(master_df, master_owner_filter, master_year_filter, master_month_filter)
+    st.dataframe(master_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
+
+with tab1:
+    # Filters for Work in Progress
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
+        owners = ["All owners"] + sorted(wip_df["Ticket Owner"].dropna().unique().tolist())
+        wip_owner_filter = st.selectbox("", owners, key="wip_owner_filter", label_visibility="collapsed")
+    with col2:
+        st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
+        wip_year_filter = st.selectbox("", available_years, key="wip_year_filter", label_visibility="collapsed")
+    with col3:
+        st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
+        wip_month_filter = st.selectbox("", available_months, key="wip_month_filter", label_visibility="collapsed")
+    
+    # Display prominent filter results
+    display_filter_results(wip_df, "Work in Progress", wip_owner_filter, wip_year_filter, wip_month_filter, "#007bff")
+    
+    # Display user statistics if specific owner is selected
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, wip_owner_filter, wip_year_filter, wip_month_filter)
+    
+    # Filter and display data
+    wip_view = get_filtered_data(wip_df, wip_owner_filter, wip_year_filter, wip_month_filter)
     st.dataframe(wip_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 with tab2:
-    st.markdown('<div class="owner-filter-container">', unsafe_allow_html=True)
-    st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
-    owners = ["All owners"] + sorted(dev_df["Ticket Owner"].dropna().unique().tolist())
-    dev_owner_filter = st.selectbox("", owners, key="dev_owner_filter", label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Filters for Under Development
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
+        owners = ["All owners"] + sorted(dev_df["Ticket Owner"].dropna().unique().tolist())
+        dev_owner_filter = st.selectbox("", owners, key="dev_owner_filter", label_visibility="collapsed")
+    with col2:
+        st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
+        dev_year_filter = st.selectbox("", available_years, key="dev_year_filter", label_visibility="collapsed")
+    with col3:
+        st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
+        dev_month_filter = st.selectbox("", available_months, key="dev_month_filter", label_visibility="collapsed")
+    
+    # Display prominent filter results
+    display_filter_results(dev_df, "Under Development", dev_owner_filter, dev_year_filter, dev_month_filter, "#fd7e14")
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, dev_owner_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, dev_owner_filter, dev_year_filter, dev_month_filter)
     
     # Filter and display data
-    dev_view = get_filtered_data(dev_df, dev_owner_filter)
+    dev_view = get_filtered_data(dev_df, dev_owner_filter, dev_year_filter, dev_month_filter)
     st.dataframe(dev_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 with tab3:
-    st.markdown('<div class="owner-filter-container">', unsafe_allow_html=True)
-    st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
-    owners = ["All owners"] + sorted(wait_df["Ticket Owner"].dropna().unique().tolist())
-    wait_owner_filter = st.selectbox("", owners, key="wait_owner_filter", label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Filters for Awaiting User Info
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
+        owners = ["All owners"] + sorted(wait_df["Ticket Owner"].dropna().unique().tolist())
+        wait_owner_filter = st.selectbox("", owners, key="wait_owner_filter", label_visibility="collapsed")
+    with col2:
+        st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
+        wait_year_filter = st.selectbox("", available_years, key="wait_year_filter", label_visibility="collapsed")
+    with col3:
+        st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
+        wait_month_filter = st.selectbox("", available_months, key="wait_month_filter", label_visibility="collapsed")
+    
+    # Display prominent filter results
+    display_filter_results(wait_df, "Awaiting User Info", wait_owner_filter, wait_year_filter, wait_month_filter, "#dc3545")
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, wait_owner_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, wait_owner_filter, wait_year_filter, wait_month_filter)
     
     # Filter and display data
-    wait_view = get_filtered_data(wait_df, wait_owner_filter)
+    wait_view = get_filtered_data(wait_df, wait_owner_filter, wait_year_filter, wait_month_filter)
     st.dataframe(wait_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
+
+with tab4:
+    # Filters for Hold
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
+        owners = ["All owners"] + sorted(hold_df["Ticket Owner"].dropna().unique().tolist())
+        hold_owner_filter = st.selectbox("", owners, key="hold_owner_filter", label_visibility="collapsed")
+    with col2:
+        st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
+        hold_year_filter = st.selectbox("", available_years, key="hold_year_filter", label_visibility="collapsed")
+    with col3:
+        st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
+        hold_month_filter = st.selectbox("", available_months, key="hold_month_filter", label_visibility="collapsed")
+    
+    # Display prominent filter results
+    display_filter_results(hold_df, "Hold", hold_owner_filter, hold_year_filter, hold_month_filter, "#6f42c1")
+    
+    # Display user statistics if specific owner is selected
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, hold_owner_filter, hold_year_filter, hold_month_filter)
+    
+    # Filter and display data
+    hold_view = get_filtered_data(hold_df, hold_owner_filter, hold_year_filter, hold_month_filter)
+    st.dataframe(hold_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
+
+with tab5:
+    # Filters for Open
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
+        owners = ["All owners"] + sorted(open_df["Ticket Owner"].dropna().unique().tolist())
+        open_owner_filter = st.selectbox("", owners, key="open_owner_filter", label_visibility="collapsed")
+    with col2:
+        st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
+        open_year_filter = st.selectbox("", available_years, key="open_year_filter", label_visibility="collapsed")
+    with col3:
+        st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
+        open_month_filter = st.selectbox("", available_months, key="open_month_filter", label_visibility="collapsed")
+    
+    # Display prominent filter results
+    display_filter_results(open_df, "Open", open_owner_filter, open_year_filter, open_month_filter, "#28a745")
+    
+    # Display user statistics if specific owner is selected
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, open_owner_filter, open_year_filter, open_month_filter)
+    
+    # Filter and display data
+    open_view = get_filtered_data(open_df, open_owner_filter, open_year_filter, open_month_filter)
+    st.dataframe(open_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
+
+with tab6:
+    # Filters for Pending
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
+        owners = ["All owners"] + sorted(pending_df["Ticket Owner"].dropna().unique().tolist())
+        pending_owner_filter = st.selectbox("", owners, key="pending_owner_filter", label_visibility="collapsed")
+    with col2:
+        st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
+        pending_year_filter = st.selectbox("", available_years, key="pending_year_filter", label_visibility="collapsed")
+    with col3:
+        st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
+        pending_month_filter = st.selectbox("", available_months, key="pending_month_filter", label_visibility="collapsed")
+    
+    # Display prominent filter results
+    display_filter_results(pending_df, "Pending", pending_owner_filter, pending_year_filter, pending_month_filter, "#ffc107")
+    
+    # Display user statistics if specific owner is selected
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, pending_owner_filter, pending_year_filter, pending_month_filter)
+    
+    # Filter and display data
+    pending_view = get_filtered_data(pending_df, pending_owner_filter, pending_year_filter, pending_month_filter)
+    st.dataframe(pending_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
+
+with tab7:
+    # Filters for Closed
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
+        owners = ["All owners"] + sorted(closed_df["Ticket Owner"].dropna().unique().tolist())
+        closed_owner_filter = st.selectbox("", owners, key="closed_owner_filter", label_visibility="collapsed")
+    with col2:
+        st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
+        closed_year_filter = st.selectbox("", available_years, key="closed_year_filter", label_visibility="collapsed")
+    with col3:
+        st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
+        closed_month_filter = st.selectbox("", available_months, key="closed_month_filter", label_visibility="collapsed")
+    
+    # Display prominent filter results
+    display_filter_results(closed_df, "Closed", closed_owner_filter, closed_year_filter, closed_month_filter, "#6c757d")
+    
+    # Display user statistics if specific owner is selected
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, closed_owner_filter, closed_year_filter, closed_month_filter)
+    
+    # Filter and display data
+    closed_view = get_filtered_data(closed_df, closed_owner_filter, closed_year_filter, closed_month_filter)
+    st.dataframe(closed_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
