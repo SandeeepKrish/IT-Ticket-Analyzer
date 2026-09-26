@@ -6,16 +6,23 @@ data-aware chatbot that can answer questions about uploaded ticket data.
 """
 
 import os
+import re
+from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
-import zipfile
-import io
+
+try:
+    from openai import OpenAI
+    HAS_OPENAI = True
+except ImportError:
+    OpenAI = None  # type: ignore[assignment,misc]
+    HAS_OPENAI = False
 
 
 def has_key_configured() -> bool:
     return bool(os.environ.get("OPENAI_API_KEY"))
 
 
-def detect_file_type(filename: str) -> str:
+def detect_file_type(filename: str) -> Optional[str]:
     """
     Detect file type based on filename using fuzzy matching.
     Ignores case, spaces, underscores, and hyphens for flexible matching.
@@ -30,8 +37,6 @@ def detect_file_type(filename: str) -> str:
     - "pending" → pending
     - "closed", "close" → closed
     """
-    import re
-    
     # Normalize filename: lowercase, remove spaces/underscores/hyphens, keep only alphanumeric
     normalized = re.sub(r'[^a-z0-9]', '', filename.lower())
     
@@ -57,7 +62,7 @@ def detect_file_type(filename: str) -> str:
     return None
 
 
-def process_folder_upload(uploaded_files: list) -> dict:
+def process_folder_upload(uploaded_files: List[Any]) -> Dict[str, Any]:
     """
     Process multiple uploaded files and map them to their categories.
     
@@ -74,9 +79,7 @@ def process_folder_upload(uploaded_files: list) -> dict:
     Returns:
         dict: Mapped dataframes with keys: master, wip, dev, wait, hold, open, pending, closed
     """
-    from openpyxl import load_workbook
-    
-    result = {
+    result: Dict[str, Any] = {
         'master': None,
         'wip': None,
         'dev': None,
@@ -93,6 +96,7 @@ def process_folder_upload(uploaded_files: list) -> dict:
         return result
     
     for uploaded_file in uploaded_files:
+        filename = ""
         try:
             # Get the file name
             filename = uploaded_file.name if hasattr(uploaded_file, 'name') else str(uploaded_file)
@@ -104,6 +108,10 @@ def process_folder_upload(uploaded_files: list) -> dict:
                 # Read the Excel file
                 df = pd.read_excel(uploaded_file, engine="openpyxl")
                 df.columns = [str(c).strip() for c in df.columns]
+                if "Ticket Number" in df.columns:
+                    df["Ticket Number"] = df["Ticket Number"].astype(str).str.strip()
+                if "Ticket Aging" in df.columns:
+                    df["Ticket Aging"] = pd.to_numeric(df["Ticket Aging"], errors="coerce").fillna(0).astype(int)
                 
                 # Store the dataframe
                 result[file_type] = df
@@ -121,7 +129,7 @@ def process_folder_upload(uploaded_files: list) -> dict:
     return result
 
 
-def validate_folder_upload(folder_result: dict) -> tuple[bool, str]:
+def validate_folder_upload(folder_result: Dict[str, Any]) -> Tuple[bool, str]:
     """
     Validate that all required files were detected and loaded.
     
@@ -129,7 +137,7 @@ def validate_folder_upload(folder_result: dict) -> tuple[bool, str]:
         tuple: (is_valid, message)
     """
     required_keys = ['master', 'wip', 'dev', 'wait', 'hold', 'open', 'pending', 'closed']
-    missing_files = [key for key in required_keys if folder_result[key] is None]
+    missing_files = [key for key in required_keys if folder_result.get(key) is None]
     
     if missing_files:
         missing_display = ', '.join([key.upper() for key in missing_files])
@@ -138,16 +146,16 @@ def validate_folder_upload(folder_result: dict) -> tuple[bool, str]:
     return True, "All files loaded successfully!"
 
 
-def get_folder_upload_summary(folder_result: dict) -> str:
+def get_folder_upload_summary(folder_result: Dict[str, Any]) -> str:
     """Generate a summary of folder upload results"""
     summary = "📂 **Folder Upload Summary:**\n\n"
     
-    if folder_result['detected_files']:
+    if folder_result.get('detected_files'):
         summary += "**✅ Detected Files:**\n"
         for detected in folder_result['detected_files']:
             summary += f"- {detected['original_name']} → {detected['detected_type'].upper()} ({detected['rows']} tickets)\n"
     
-    if folder_result['unrecognized_files']:
+    if folder_result.get('unrecognized_files'):
         summary += "\n**⚠️ Unrecognized Files:**\n"
         for unrecognized in folder_result['unrecognized_files']:
             summary += f"- {unrecognized}\n"
@@ -158,7 +166,8 @@ def get_folder_upload_summary(folder_result: dict) -> str:
 def draft_reply(row: pd.Series) -> str:
     """Ask OpenAI to draft a short follow-up asking the customer for the
     missing information needed to move this ticket forward."""
-    from openai import OpenAI
+    if OpenAI is None:
+        raise RuntimeError("OpenAI package is not installed. Please install it using `pip install openai`.")
 
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -187,16 +196,18 @@ needed to proceed. Sign off simply as "Support Team"."""
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+    return (content or "").strip()
 
 
-def get_chatbot_response(user_question: str, data_context: dict) -> str:
+def get_chatbot_response(user_question: str, data_context: Dict[str, Any]) -> str:
     """Get AI response to user questions about the ticket data"""
-    from openai import OpenAI
+    if OpenAI is None:
+        return "The OpenAI package is not installed. Please install `openai` to use the chatbot."
 
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("No OpenAI API key configured.")
+        return "No OpenAI API key configured. Please enter your API key in the sidebar."
 
     client = OpenAI(api_key=api_key)
 
@@ -245,19 +256,29 @@ USER QUESTION: {user_question}"""
                 {"role": "user", "content": context_prompt}
             ],
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return (content or "").strip()
     except Exception as e:
         return f"I'm sorry, I encountered an error: {str(e)}. Please make sure your OpenAI API key is configured correctly."
 
 
-def generate_data_context(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df):
+def generate_data_context(
+    master_df: Optional[pd.DataFrame] = None,
+    wip_df: Optional[pd.DataFrame] = None,
+    dev_df: Optional[pd.DataFrame] = None,
+    wait_df: Optional[pd.DataFrame] = None,
+    hold_df: Optional[pd.DataFrame] = None,
+    open_df: Optional[pd.DataFrame] = None,
+    pending_df: Optional[pd.DataFrame] = None,
+    closed_df: Optional[pd.DataFrame] = None,
+) -> Dict[str, Any]:
     """Generate context about the current data for the chatbot"""
     
     # Get top owners
-    all_owners = []
+    all_owners: List[str] = []
     for df in [wip_df, dev_df, wait_df, hold_df, open_df, pending_df]:
-        if df is not None:
-            all_owners.extend(df["Ticket Owner"].dropna().tolist())
+        if df is not None and not df.empty and "Ticket Owner" in df.columns:
+            all_owners.extend(df["Ticket Owner"].dropna().astype(str).tolist())
     
     if all_owners:
         owner_counts = pd.Series(all_owners).value_counts().head(5)
@@ -276,3 +297,4 @@ def generate_data_context(master_df, wip_df, dev_df, wait_df, hold_df, open_df, 
         'closed_count': len(closed_df) if closed_df is not None else 0,
         'top_owners': top_owners
     }
+

@@ -8,13 +8,22 @@ ticket for the same owner — so nothing sits stuck waiting on a reply.
 Run with:  streamlit run app.py
 """
 
+from __future__ import annotations
+
 import os
+from typing import Any, Set
 
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
-from ai import draft_reply, has_key_configured, detect_file_type, process_folder_upload, validate_folder_upload, get_folder_upload_summary
+from ai import (
+    draft_reply,
+    get_folder_upload_summary,
+    has_key_configured,
+    process_folder_upload,
+    validate_folder_upload,
+)
 
 load_dotenv()
 
@@ -25,603 +34,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional styling
-st.markdown("""
-<style>
-    /* Main page styling */
-    .stApp {
-        background: #ffffff;
-        min-height: 100vh;
-    }
-    
-    /* Header styling */
-    .main-header {
-        padding: 1.5rem 0;
-        margin-bottom: 2rem;
-        border-bottom: 1px solid #e9ecef;
-        background: transparent;
-    }
-    
-    .main-title {
-        color: #2c3e50;
-        font-size: 1.8rem;
-        font-weight: 600;
-        margin-bottom: 0.3rem;
-        text-align: left;
-    }
-    
-    .main-subtitle {
-        color: #6c757d;
-        font-size: 0.95rem;
-        text-align: left;
-        margin-bottom: 0;
-    }
-    
-    /* Metric cards */
-    .metric-container {
-        display: flex;
-        gap: 1rem;
-        margin: 2rem 0;
-        justify-content: center;
-    }
-    
-    .metric-card {
-        background: #f8f9fa;
-        padding: 1.2rem;
-        border-radius: 8px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border: 1px solid #dee2e6;
-        min-width: 160px;
-    }
-    
-    .metric-value {
-        font-size: 2rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-    
-    .metric-label {
-        color: #6c757d;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        font-weight: 500;
-    }
-    
-    .wip-metric { border-left: 3px solid #007bff; }
-    .dev-metric { border-left: 3px solid #fd7e14; }
-    .wait-metric { border-left: 3px solid #dc3545; }
-    .hold-metric { border-left: 3px solid #6f42c1; }
-    .open-metric { border-left: 3px solid #28a745; }
-    .pending-metric { border-left: 3px solid #ffc107; }
-    .closed-metric { border-left: 3px solid #6c757d; }
-    
-    /* Compact sidebar styling */
-    .sidebar .stFileUploader {
-        margin-bottom: 0.5rem !important;
-    }
-    
-    .sidebar .stFileUploader > div {
-        padding: 0.2rem 0 !important;
-    }
-    
-    .sidebar h4 {
-        margin-bottom: 0.2rem !important;
-        margin-top: 0.5rem !important;
-        font-size: 0.85rem !important;
-        font-weight: 600 !important;
-        color: #495057 !important;
-    }
-    
-    /* Status indicators */
-    .status-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1rem;
-        margin: 1.5rem 0;
-    }
-    
-    .status-card {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 8px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border: 1px solid #dee2e6;
-    }
-    
-    .status-found {
-        border-left: 3px solid #28a745;
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .status-not-found {
-        border-left: 3px solid #dc3545;
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    /* Ticket card styling */
-    .ticket-card {
-        background: #ffffff;
-        padding: 1.5rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border: 1px solid #dee2e6;
-        margin: 1rem 0;
-    }
-    
-    .ticket-header {
-        color: #2c3e50;
-        font-size: 1.3rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-        padding-bottom: 0.8rem;
-        border-bottom: 2px solid #e9ecef;
-    }
-    
-    .ticket-info-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 0.8rem;
-        margin-bottom: 1rem;
-    }
-    
-    .ticket-info-item {
-        text-align: center;
-        padding: 0.8rem;
-        background: #f8f9fa;
-        border-radius: 6px;
-        border: 1px solid #e9ecef;
-    }
-    
-    .ticket-info-label {
-        font-weight: 500;
-        color: #495057;
-        font-size: 0.85rem;
-        margin-bottom: 0.4rem;
-    }
-    
-    .ticket-info-value {
-        color: #212529;
-        font-size: 0.95rem;
-    }
-    
-    /* Search styling - Remove white container */
-    .search-section {
-        margin: 1.5rem 0;
-    }
-    
-    .search-title {
-        color: #2c3e50;
-        font-size: 1.3rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-    
-    /* Sidebar styling */
-    .sidebar-header {
-        color: #2c3e50;
-        font-size: 1.1rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-        text-align: left;
-    }
-    
-    /* Related tickets styling */
-    .related-section {
-        background: #f8f9fa;
-        padding: 1.2rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 1rem;
-        border: 1px solid #dee2e6;
-    }
-    
-    .related-header {
-        color: #2c3e50;
-        font-weight: 600;
-        font-size: 1rem;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 2px solid #dee2e6;
-    }
-    
-    /* Hide streamlit branding and margins */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .stApp > header {display: none;}
-    
-    /* Custom button styling */
-    .stButton > button {
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 0.4rem 0.8rem;
-        font-weight: 500;
-        font-size: 0.9rem;
-        transition: all 0.2s ease;
-    }
-    
-    .stButton > button:hover {
-        background: #0056b3;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
-    }
-    
-    /* Info boxes styling */
-    .stAlert {
-        border-radius: 6px;
-        border: 1px solid #dee2e6;
-    }
-    
-    /* Enhanced filter section styling */
-    .filter-section {
-        background: #f8f9fa;
-        padding: 1.5rem;
-        border-radius: 8px;
-        margin: 1.5rem 0;
-        border: 1px solid #dee2e6;
-    }
-    
-    .filter-title {
-        color: #2c3e50;
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-    
-    /* User statistics cards */
-    .user-stats-container {
-        display: flex;
-        gap: 1rem;
-        margin: 1rem 0;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-    
-    .user-stat-card {
-        background: #ffffff;
-        padding: 1rem;
-        border-radius: 8px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border: 1px solid #dee2e6;
-        min-width: 140px;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .user-stat-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: var(--border-color);
-    }
-    
-    .stat-number {
-        font-size: 1.8rem;
-        font-weight: 600;
-        margin-bottom: 0.3rem;
-        color: var(--number-color);
-    }
-    
-    .stat-label {
-        color: #6c757d;
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        font-weight: 500;
-    }
-    
-    /* Spinner animation for numbers */
-    @keyframes countUp {
-        from { transform: translateY(20px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-    }
-    
-    .animate-count {
-        animation: countUp 0.5s ease-out;
-    }
-    
-    /* Tab styling improvements */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0.5rem;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: #007bff;
-        color: white !important;
-        border-color: #007bff;
-    }
-    
-    /* Owner filter styling */
-    .owner-filter-container {
-        background: #ffffff;
-        padding: 1rem;
-        border-radius: 6px;
-        border: 1px solid #dee2e6;
-        margin-bottom: 1rem;
-    }
-    
-    .filter-label {
-        color: #495057;
-        font-weight: 500;
-        font-size: 0.9rem;
-        margin-bottom: 0.5rem;
-    }
-    /* Workflow diagram styling */
-    .workflow-container {
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 2rem;
-        margin: 1.5rem 0;
-    }
-    
-    .workflow-title {
-        text-align: center;
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: #2c3e50;
-        margin-bottom: 2rem;
-    }
-    
-    .workflow-steps {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 2rem;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-    
-    .workflow-step {
-        display: flex;
-        align-items: center;
-        background: white;
-        border: 2px solid #007bff;
-        border-radius: 8px;
-        padding: 1rem;
-        min-width: 150px;
-    }
-    
-    .step-number {
-        background: #007bff;
-        color: white;
-        border-radius: 50%;
-        width: 25px;
-        height: 25px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        margin-right: 0.8rem;
-        font-size: 0.9rem;
-    }
-    
-    .step-title {
-        font-weight: 600;
-        color: #2c3e50;
-        font-size: 0.9rem;
-    }
-    
-    .step-desc {
-        font-size: 0.8rem;
-        color: #6c757d;
-        margin-top: 0.2rem;
-    }
-    
-    .workflow-arrow {
-        font-size: 1.5rem;
-        color: #007bff;
-        font-weight: bold;
-        margin: 0 0.5rem;
-    }
-    
-    .workflow-branches {
-        display: flex;
-        justify-content: space-around;
-        margin-bottom: 2rem;
-        flex-wrap: wrap;
-        gap: 1rem;
-    }
-    
-    .branch {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        min-width: 180px;
-    }
-    
-    .branch-arrow {
-        font-size: 1.5rem;
-        color: #fd7e14;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-    }
-    
-    .branch-step {
-        background: white;
-        border: 2px solid #fd7e14;
-        border-radius: 8px;
-        padding: 1rem;
-        text-align: center;
-        width: 100%;
-    }
-    
-    .workflow-final {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .final-arrow {
-        font-size: 1.5rem;
-        color: #28a745;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-    }
-    
-    .final-step {
-        background: white;
-        border: 2px solid #28a745;
-        border-radius: 8px;
-        padding: 1rem;
-        text-align: center;
-        min-width: 200px;
-    }
-    
-    /* Master ticket status styling */
-    .master-status {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 1rem 0;
-        text-align: center;
-    }
-    
-    .status-workflow {
-        background: white;
-        border: 2px solid var(--status-color);
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-    }
-    
-    .status-workflow-title {
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: var(--status-color);
-        margin-bottom: 0.5rem;
-    }
-    
-    .status-workflow-desc {
-        color: #6c757d;
-        margin-bottom: 1rem;
-    }
-    
-    .status-workflow-next {
-        background: var(--status-color);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 6px;
-        font-size: 0.9rem;
-        font-weight: 500;
-    }
-    
-    /* Date filter results styling */
-    .filter-results {
-        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-        color: white;
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 1rem 0;
-        text-align: center;
-        box-shadow: 0 2px 8px rgba(0,123,255,0.3);
-    }
-    
-    .filter-results-count {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-    }
-    
-    .filter-results-label {
-        font-size: 1rem;
-        opacity: 0.9;
-        margin-bottom: 0.25rem;
-    }
-    
-    .filter-results-details {
-        font-size: 0.9rem;
-        opacity: 0.8;
-    }
-    
-    .monthly-breakdown {
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 1rem;
-        margin: 1rem 0;
-    }
-    
-    .monthly-breakdown-title {
-        font-weight: 600;
-        color: #2c3e50;
-        margin-bottom: 0.5rem;
-    }
-    
-    .monthly-breakdown-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 0.5rem;
-        margin-top: 0.5rem;
-    }
-    
-    .month-item {
-        background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
-        padding: 0.5rem;
-        text-align: center;
-        font-size: 0.85rem;
-    }
-    
-    .month-name {
-        font-weight: 500;
-        color: #495057;
-    }
-    
-    .month-count {
-        font-weight: 600;
-        color: #007bff;
-        font-size: 1rem;
-    }
-    
-    /* Welcome section styling */
-    .welcome-section {
-        background: #f8f9fa;
-        padding: 2rem;
-        border-radius: 8px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin: 2rem 0;
-        border: 1px solid #dee2e6;
-    }
-    
-    .welcome-title {
-        color: #007bff;
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-    
-    .welcome-text {
-        color: #6c757d;
-        font-size: 1rem;
-        line-height: 1.4;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Load external CSS stylesheet
+def _load_css(css_path: str) -> None:
+    """Read a CSS file and inject it into the Streamlit page."""
+    with open(css_path, "r", encoding="utf-8") as f:
+        css = f.read()
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
-def display_filter_results(df: pd.DataFrame, category_name: str, owner_filter: str, year_filter: str, month_filter: str, category_color: str):
+_load_css(os.path.join(os.path.dirname(__file__), "style.css"))
+
+
+def display_filter_results(df: pd.DataFrame, category_name: str, owner_filter: Any, year_filter: Any, month_filter: Any, category_color: str):
     """Display prominent filter results with ticket counts and breakdowns"""
     
     # Get filtered data
@@ -770,19 +193,26 @@ def get_combined_date_filters(master_df, wip_df, dev_df, wait_df, hold_df, open_
 
 def display_user_statistics(wip_df: pd.DataFrame, dev_df: pd.DataFrame, wait_df: pd.DataFrame, 
                            hold_df: pd.DataFrame, open_df: pd.DataFrame, pending_df: pd.DataFrame, 
-                           closed_df: pd.DataFrame, selected_owner: str, year_filter=None, month_filter=None):
+                           closed_df: pd.DataFrame, selected_owner: Any, year_filter=None, month_filter=None):
     """Display statistics for the selected owner with animated counters"""
     if selected_owner == "All owners":
         return
     
-    # Calculate statistics for the selected owner across all files with date filtering
-    wip_count = len(filter_by_date(wip_df[wip_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(wip_df[wip_df["Ticket Owner"] == selected_owner])
-    dev_count = len(filter_by_date(dev_df[dev_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(dev_df[dev_df["Ticket Owner"] == selected_owner])
-    wait_count = len(filter_by_date(wait_df[wait_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(wait_df[wait_df["Ticket Owner"] == selected_owner])
-    hold_count = len(filter_by_date(hold_df[hold_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(hold_df[hold_df["Ticket Owner"] == selected_owner])
-    open_count = len(filter_by_date(open_df[open_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(open_df[open_df["Ticket Owner"] == selected_owner])
-    pending_count = len(filter_by_date(pending_df[pending_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(pending_df[pending_df["Ticket Owner"] == selected_owner])
-    closed_count = len(filter_by_date(closed_df[closed_df["Ticket Owner"] == selected_owner], year_filter, month_filter)) if year_filter and month_filter else len(closed_df[closed_df["Ticket Owner"] == selected_owner])
+    def _count(df):
+        if df is None or df.empty or "Ticket Owner" not in df.columns:
+            return 0
+        sub_df = df[df["Ticket Owner"] == selected_owner]
+        if year_filter and month_filter:
+            return len(filter_by_date(sub_df, year_filter, month_filter))
+        return len(sub_df)
+
+    wip_count = _count(wip_df)
+    dev_count = _count(dev_df)
+    wait_count = _count(wait_df)
+    hold_count = _count(hold_df)
+    open_count = _count(open_df)
+    pending_count = _count(pending_df)
+    closed_count = _count(closed_df)
     
     total_active = wip_count + dev_count + wait_count + hold_count + open_count + pending_count
     
@@ -841,7 +271,12 @@ def get_ticket_workflow_status(ticket_no: str, wip_df, dev_df, wait_df, hold_df,
     # Check if ticket exists in master list
     master_match = master_df[master_df["Ticket Number"].str.upper() == ticket_no.upper()]
     if master_match.empty:
-        return None, "not_in_master", "Ticket not found in Master list"
+        return None, "not_in_master", {
+            "title": "🚫 Ticket Not Found",
+            "description": "Ticket not found in Master list",
+            "color": "#dc3545",
+            "next_step": "Please check the ticket number and try again"
+        }
     
     # Check current status across all files
     status_checks = {
@@ -926,7 +361,7 @@ def display_workflow_diagram():
     """Display the ticket workflow process"""
     st.markdown("""
     <div class="workflow-container">
-        <div class="workflow-title">� Ticket Workflow Process</div>
+        <div class="workflow-title">🔄 Ticket Workflow Process</div>
         <div class="workflow-steps">
             <div class="workflow-step">
                 <div class="step-number">1</div>
@@ -995,7 +430,7 @@ def display_workflow_diagram():
     """, unsafe_allow_html=True)
 
 
-def get_filtered_data(df: pd.DataFrame, owner_filter: str, year_filter=None, month_filter=None):
+def get_filtered_data(df: pd.DataFrame, owner_filter: Any, year_filter=None, month_filter=None) -> pd.DataFrame:
     """Filter dataframe by owner, year, and month"""
     filtered_df = df.copy()
     
@@ -1088,7 +523,7 @@ def related_list(df: pd.DataFrame, owner: str, exclude_ticket: str, empty_msg: s
     related = df[(df["Ticket Owner"] == owner) & (df["Ticket Number"] != exclude_ticket)]
     related = related.sort_values("Ticket Aging", ascending=False)
     
-    st.markdown(f'<div class="related-section">', unsafe_allow_html=True)
+    st.markdown('<div class="related-section">', unsafe_allow_html=True)
     st.markdown(f'<div class="related-header">{section_title}</div>', unsafe_allow_html=True)
     
     if related.empty:
@@ -1175,20 +610,20 @@ with st.sidebar:
         st.markdown("**📋 MASTER**")
         master_file = st.file_uploader("", type="xlsx", key="master", help="Master ticket list - all tickets")
         
-        st.markdown("**� WIP**")
+        st.markdown("**📊 WIP**")
         wip_file = st.file_uploader("", type="xlsx", key="wip", help="Work in Progress tickets")
         
-        st.markdown("**� DEV**") 
+        st.markdown("**🔧 DEV**")
         dev_file = st.file_uploader("", type="xlsx", key="dev", help="Under Development tickets")
         
-        st.markdown("**� WAIT**")
+        st.markdown("**⚠️ WAIT**")
         wait_file = st.file_uploader("", type="xlsx", key="wait", help="Awaiting User Info tickets")
     
     with col2:
-        st.markdown("**� HOLD**")
+        st.markdown("**⏸️ HOLD**")
         hold_file = st.file_uploader("", type="xlsx", key="hold", help="Hold tickets")
         
-        st.markdown("**�🟢 OPEN**")
+        st.markdown("**🟢 OPEN**")
         open_file = st.file_uploader("", type="xlsx", key="open", help="Open tickets")
         
         st.markdown("**🟠 PENDING**")
@@ -1231,10 +666,28 @@ if use_folder_data:
     open_df = st.session_state.get("open_df")
     pending_df = st.session_state.get("pending_df")
     closed_df = st.session_state.get("closed_df")
+
+    if any(df is None for df in [master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df]):
+        st.markdown("""
+        <div class="welcome-section">
+            <div class="welcome-title">🚀 Folder Data Incomplete</div>
+            <div class="welcome-text">Please re-upload your folder files or select all 8 Excel files in the sidebar.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
+
+    assert isinstance(master_df, pd.DataFrame)
+    assert isinstance(wip_df, pd.DataFrame)
+    assert isinstance(dev_df, pd.DataFrame)
+    assert isinstance(wait_df, pd.DataFrame)
+    assert isinstance(hold_df, pd.DataFrame)
+    assert isinstance(open_df, pd.DataFrame)
+    assert isinstance(pending_df, pd.DataFrame)
+    assert isinstance(closed_df, pd.DataFrame)
 else:
     # Load from manual uploads
     if not all([master_file, wip_file, dev_file, wait_file, hold_file, open_file, pending_file, closed_file]):
-        st.markdown(f"""
+        st.markdown("""
         <div class="welcome-section">
             <div class="welcome-title">🚀 Upload Required Files</div>
             <div class="welcome-text">Please upload all 8 ticket export files in the sidebar to begin comprehensive ticket analysis.</div>
@@ -1330,12 +783,12 @@ if ticket_no:
         st.info("💡 **Note**: All tickets must first be created in the Master List before appearing in workflow categories.")
     else:
         # Display workflow status
-        if workflow_info:
+        if isinstance(workflow_info, dict):
             st.markdown(f"""
-            <div class="status-workflow" style="--status-color: {workflow_info['color']};">
-                <div class="status-workflow-title">{workflow_info['title']}</div>
-                <div class="status-workflow-desc">{workflow_info['description']}</div>
-                <div class="status-workflow-next">Next Step: {workflow_info['next_step']}</div>
+            <div class="status-workflow" style="--status-color: {workflow_info.get('color', '#6c757d')};">
+                <div class="status-workflow-title">{workflow_info.get('title', '')}</div>
+                <div class="status-workflow-desc">{workflow_info.get('description', '')}</div>
+                <div class="status-workflow-next">Next Step: {workflow_info.get('next_step', '')}</div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -1432,14 +885,10 @@ st.divider()
 
 # Enhanced filtering section
 st.markdown("### 🔍 Filter by Owner")
-all_owners = set()
-all_owners.update(wip_df["Ticket Owner"].dropna().unique())
-all_owners.update(dev_df["Ticket Owner"].dropna().unique())
-all_owners.update(wait_df["Ticket Owner"].dropna().unique())
-all_owners.update(hold_df["Ticket Owner"].dropna().unique())
-all_owners.update(open_df["Ticket Owner"].dropna().unique())
-all_owners.update(pending_df["Ticket Owner"].dropna().unique())
-all_owners.update(closed_df["Ticket Owner"].dropna().unique())
+all_owners: Set[str] = set()
+for df_item in [wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df]:
+    if df_item is not None and not df_item.empty and "Ticket Owner" in df_item.columns:
+        all_owners.update(str(o) for o in df_item["Ticket Owner"].dropna().unique())
 all_owners_list = ["All owners"] + sorted(list(all_owners))
 
 selected_owner = st.selectbox(

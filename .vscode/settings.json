@@ -1,0 +1,15 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\erp1\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "python.analysis.extraPaths": [
+        "C:\\Users\\erp1\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages",
+        "y:\\Common\\SandeepERPandIT\\SANDDEP TECH\\ticket-flow-tracker-py"
+    ],
+    "python.autoComplete.extraPaths": [
+        "C:\\Users\\erp1\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages",
+        "y:\\Common\\SandeepERPandIT\\SANDDEP TECH\\ticket-flow-tracker-py"
+    ],
+    "python.analysis.typeCheckingMode": "off",
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.reportMissingImports": "none",
+    "python.analysis.reportMissingModuleSource": "none"
+}
