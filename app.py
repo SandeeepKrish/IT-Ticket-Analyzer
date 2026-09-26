@@ -19,11 +19,14 @@ from dotenv import load_dotenv
 
 from ai import (
     draft_reply,
+    generate_data_context,
+    get_chatbot_response,
     get_folder_upload_summary,
     has_key_configured,
     process_folder_upload,
     validate_folder_upload,
 )
+from footer import render_footer
 
 load_dotenv()
 
@@ -559,6 +562,88 @@ def related_list(df: pd.DataFrame, owner: str, exclude_ticket: str, empty_msg: s
     st.markdown('</div>', unsafe_allow_html=True)
 
 
+def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df):
+    """Render an AI ticket assistant chat box that answers questions about uploaded Excel files."""
+    st.divider()
+    st.markdown('<div class="chat-assistant-wrapper">', unsafe_allow_html=True)
+    
+    col_h1, col_h2 = st.columns([3, 1])
+    with col_h1:
+        st.markdown("""
+        <div class="chat-header-title">
+            <span>💬 AI Ticket Assistant</span>
+            <span class="chat-header-badge">Smart AI</span>
+        </div>
+        <p style="color: #64748b; font-size: 0.88rem; margin: 0.2rem 0 0.6rem 0;">
+            Ask any question about your uploaded Excel ticket data, owner workloads, priorities, aging, or specific ticket numbers.
+        </p>
+        """, unsafe_allow_html=True)
+    with col_h2:
+        if st.button("🗑️ Clear Chat", key="clear_chat_history", use_container_width=True):
+            st.session_state["chatbot_messages"] = []
+            st.rerun()
+
+    data_ctx = generate_data_context(
+        master_df=master_df,
+        wip_df=wip_df,
+        dev_df=dev_df,
+        wait_df=wait_df,
+        hold_df=hold_df,
+        open_df=open_df,
+        pending_df=pending_df,
+        closed_df=closed_df
+    )
+
+    if "chatbot_messages" not in st.session_state:
+        st.session_state["chatbot_messages"] = [
+            {
+                "role": "assistant",
+                "content": "👋 Hi! I'm your AI Ticket Assistant. Ask me anything about your uploaded Excel files! For example: *'What is the ticket count breakdown?'*, *'Who has the most open tickets?'*, or search for a specific ticket number."
+            }
+        ]
+
+    # Quick suggestion prompt chips
+    st.markdown("**💡 Quick Questions:**")
+    scol1, scol2, scol3, scol4 = st.columns(4)
+    suggestion_prompt = None
+    with scol1:
+        if st.button("📊 Excel Data Summary", key="chip_summary", use_container_width=True):
+            suggestion_prompt = "Give me a complete summary of all uploaded Excel ticket files, counts, and status."
+    with scol2:
+        if st.button("👥 Top Owner Workloads", key="chip_owners", use_container_width=True):
+            suggestion_prompt = "Who are the top ticket owners and how many tickets does each owner have?"
+    with scol3:
+        if st.button("⏱️ Highest Aging Tickets", key="chip_aging", use_container_width=True):
+            suggestion_prompt = "Which ticket categories or owners have the highest aging days?"
+    with scol4:
+        if st.button("⚠️ Pending & Hold Info", key="chip_pending", use_container_width=True):
+            suggestion_prompt = "How many tickets are in Pending or Hold status and what are their details?"
+
+    # Display chat message history
+    for message in st.session_state["chatbot_messages"]:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat Input Box at the bottom
+    user_input = st.chat_input("Ask any question about your uploaded Excel files...")
+    
+    prompt = suggestion_prompt or user_input
+    
+    if prompt:
+        st.session_state["chatbot_messages"].append({"role": "user", "content": prompt})
+        
+        with st.spinner("Analyzing Excel data with AI..."):
+            response_text = get_chatbot_response(
+                user_question=prompt,
+                data_context=data_ctx,
+                history=st.session_state["chatbot_messages"]
+            )
+            st.session_state["chatbot_messages"].append({"role": "assistant", "content": response_text})
+        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
 # ---------------------------------------------------------------- Sidebar
 with st.sidebar:
     st.markdown('<div class="sidebar-header">📂 Upload Ticket Reports</div>', unsafe_allow_html=True)
@@ -674,6 +759,7 @@ if use_folder_data:
             <div class="welcome-text">Please re-upload your folder files or select all 8 Excel files in the sidebar.</div>
         </div>
         """, unsafe_allow_html=True)
+        render_footer()
         st.stop()
 
     assert isinstance(master_df, pd.DataFrame)
@@ -693,6 +779,7 @@ else:
             <div class="welcome-text">Please upload all 8 ticket export files in the sidebar to begin comprehensive ticket analysis.</div>
         </div>
         """, unsafe_allow_html=True)
+        render_footer()
         st.stop()
 
     # Load all 8 files including master
@@ -1163,3 +1250,8 @@ with tab7:
     # Filter and display data
     closed_view = get_filtered_data(closed_df, closed_owner_filter, closed_year_filter, closed_month_filter)
     st.dataframe(closed_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
+
+# ---------------------------------------------------------------- AI Assistant & Footer
+render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df)
+render_footer()
+

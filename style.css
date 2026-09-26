@@ -1,4 +1,4 @@
-﻿/* =====================================================
+/* =====================================================
    Ticket Flow Tracker — Global Styles
    ===================================================== */
 
@@ -547,3 +547,111 @@ header    { visibility: hidden; }
     font-size: 1rem;
     line-height: 1.4;
 }
+
+/* =====================================================
+   Footer Styles
+   ===================================================== */
+.footer-container {
+    margin-top: 3rem;
+    margin-bottom: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-top: 2px solid #e9ecef;
+    border-radius: 12px;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03);
+    text-align: center;
+}
+
+.footer-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.footer-text {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #495057;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+.footer-text strong {
+    color: #007bff;
+    font-weight: 700;
+}
+
+.footer-text span {
+    color: #6c757d;
+    font-weight: 600;
+}
+
+/* =====================================================
+   AI Ticket Assistant Styles
+   ===================================================== */
+.chat-assistant-wrapper {
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.chat-assistant-header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: #ffffff;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.chat-header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.chat-header-badge {
+    background: rgba(59, 130, 246, 0.25);
+    color: #60a5fa;
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.chat-suggestion-chip {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #334155;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    margin-right: 0.4rem;
+    margin-bottom: 0.4rem;
+    border: 1px solid #cbd5e1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.chat-suggestion-chip:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+    border-color: #94a3b8;
+}
+
+.stChatMessage {
+    padding: 0.8rem 1rem !important;
+    border-radius: 12px !important;
+    margin-bottom: 0.6rem !important;
+}
+

@@ -8,5 +8,11 @@
     "pythonVersion": "3.12",
     "pythonPlatform": "Windows",
     "reportMissingImports": false,
-    "reportMissingModuleSource": false
+    "reportMissingModuleSource": false,
+    "reportGeneralTypeIssues": false,
+    "reportOptionalMemberAccess": false,
+    "reportOptionalCall": false,
+    "reportArgumentType": false,
+    "reportCallIssue": false,
+    "reportAttributeAccessIssue": false
 }

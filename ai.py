@@ -173,7 +173,7 @@ def draft_reply(row: pd.Series) -> str:
     if not api_key:
         raise RuntimeError("No OpenAI API key configured.")
 
-    client = OpenAI(api_key=api_key)
+    client: Any = OpenAI(api_key=api_key)
 
     description = str(row.get("Description", "") or "").strip()
 
@@ -200,66 +200,55 @@ needed to proceed. Sign off simply as "Support Team"."""
     return (content or "").strip()
 
 
-def get_chatbot_response(user_question: str, data_context: Dict[str, Any]) -> str:
-    """Get AI response to user questions about the ticket data"""
-    if OpenAI is None:
-        return "The OpenAI package is not installed. Please install `openai` to use the chatbot."
-
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        return "No OpenAI API key configured. Please enter your API key in the sidebar."
-
-    client = OpenAI(api_key=api_key)
-
-    # Build context about the data
-    context_prompt = f"""You are a helpful assistant for a ticket management system. Answer questions about the uploaded ticket data.
-
-CURRENT DATA SUMMARY:
-- Master List: {data_context.get('master_count', 0)} tickets
-- Work in Progress: {data_context.get('wip_count', 0)} tickets  
-- Under Development: {data_context.get('dev_count', 0)} tickets
-- Awaiting User Info: {data_context.get('wait_count', 0)} tickets
-- Hold: {data_context.get('hold_count', 0)} tickets
-- Open: {data_context.get('open_count', 0)} tickets
-- Pending: {data_context.get('pending_count', 0)} tickets
-- Closed: {data_context.get('closed_count', 0)} tickets
-
-TOP OWNERS BY TICKET COUNT:
-{data_context.get('top_owners', 'No data available')}
-
-WORKFLOW INFORMATION:
-- Open → Work in Progress → (Awaiting User Info / Under Development / Hold / Pending) → Closed
-- Master List contains all tickets across the system
-- Tickets can move between different statuses based on progress
-
-COMMON QUESTIONS I CAN HELP WITH:
-- Ticket counts and statistics
-- Owner workloads and assignments
-- Status explanations and workflow
-- Finding specific tickets or information
-- Data analysis and trends
-
-Please provide helpful, accurate responses based on this data. If asked about specific ticket details that aren't in the summary, suggest they use the search function or specific tabs.
-
-USER QUESTION: {user_question}"""
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            max_tokens=500,
-            temperature=0.7,
-            messages=[
-                {
-                    "role": "system", 
-                    "content": "You are a helpful ticket management assistant. Provide clear, concise answers about ticket data and workflow. Be friendly but professional."
-                },
-                {"role": "user", "content": context_prompt}
-            ],
-        )
-        content = response.choices[0].message.content
-        return (content or "").strip()
-    except Exception as e:
-        return f"I'm sorry, I encountered an error: {str(e)}. Please make sure your OpenAI API key is configured correctly."
+def search_data_for_question(user_question: str, data_context: Dict[str, Any]) -> str:
+    """Search uploaded Excel data for specific keywords, ticket numbers, or owner names."""
+    raw_dfs = data_context.get('raw_dfs', {})
+    if not raw_dfs:
+        return ""
+    
+    found_info: List[str] = []
+    
+    # Split question into clean search tokens
+    tokens = [t.strip() for t in re.split(r'[\s,;:?!\'"()]+', user_question) if len(t.strip()) > 1]
+    
+    # 1. Search for matching ticket number
+    for category, df in raw_dfs.items():
+        if df is None or df.empty or "Ticket Number" not in df.columns:
+            continue
+        for token in tokens:
+            matches = df[df["Ticket Number"].astype(str).str.upper() == token.upper()]
+            if not matches.empty:
+                for _, row in matches.head(3).iterrows():
+                    found_info.append(
+                        f"Found matching ticket '{row['Ticket Number']}' in {category}:\n"
+                        f"  Subject: {row.get('Subject', 'N/A')}\n"
+                        f"  Owner: {row.get('Ticket Owner', 'N/A')}\n"
+                        f"  Customer: {row.get('Customer Name', 'N/A')}\n"
+                        f"  Status: {row.get('Status', category)}\n"
+                        f"  Priority: {row.get('Ticket Priority', 'N/A')}\n"
+                        f"  Aging: {row.get('Ticket Aging', 'N/A')} days\n"
+                        f"  Start Date: {row.get('Start Date', 'N/A')}\n"
+                        f"  Description: {str(row.get('Description', 'N/A'))[:200]}"
+                    )
+    
+    # 2. Search for matching owner name
+    for category, df in raw_dfs.items():
+        if df is None or df.empty or "Ticket Owner" not in df.columns:
+            continue
+        for token in tokens:
+            if len(token) >= 3 and token.lower() not in ["show", "list", "tickets", "what", "how", "many", "tell", "about", "with", "from"]:
+                owner_matches = df[df["Ticket Owner"].astype(str).str.lower().str.contains(token.lower(), na=False)]
+                if not owner_matches.empty:
+                    count = len(owner_matches)
+                    sample_tickets = owner_matches["Ticket Number"].astype(str).head(5).tolist()
+                    found_info.append(
+                        f"Owner match for '{token}' in {category}: {count} ticket(s). Sample Ticket Numbers: {', '.join(sample_tickets)}"
+                    )
+    
+    if found_info:
+        unique_info = list(dict.fromkeys(found_info))
+        return "\n\nDETAILED MATCHES FOUND IN UPLOADED EXCEL DATA:\n" + "\n".join(unique_info[:10])
+    return ""
 
 
 def generate_data_context(
@@ -272,29 +261,120 @@ def generate_data_context(
     pending_df: Optional[pd.DataFrame] = None,
     closed_df: Optional[pd.DataFrame] = None,
 ) -> Dict[str, Any]:
-    """Generate context about the current data for the chatbot"""
+    """Generate comprehensive context about the current data for the chatbot"""
+    df_map = {
+        'Master': master_df,
+        'Work in Progress (WIP)': wip_df,
+        'Under Development (DEV)': dev_df,
+        'Awaiting User Info (WAIT)': wait_df,
+        'Hold': hold_df,
+        'Open': open_df,
+        'Pending': pending_df,
+        'Closed': closed_df,
+    }
     
-    # Get top owners
+    counts = {name: (len(df) if df is not None and not df.empty else 0) for name, df in df_map.items()}
+    
     all_owners: List[str] = []
-    for df in [wip_df, dev_df, wait_df, hold_df, open_df, pending_df]:
-        if df is not None and not df.empty and "Ticket Owner" in df.columns:
-            all_owners.extend(df["Ticket Owner"].dropna().astype(str).tolist())
+    priorities: List[str] = []
+    aging_stats: List[str] = []
     
+    for name, df in df_map.items():
+        if df is not None and not df.empty:
+            if "Ticket Owner" in df.columns:
+                all_owners.extend(df["Ticket Owner"].dropna().astype(str).tolist())
+            if "Ticket Priority" in df.columns:
+                priorities.extend(df["Ticket Priority"].dropna().astype(str).tolist())
+            if "Ticket Aging" in df.columns and len(df) > 0:
+                mean_a = df["Ticket Aging"].mean()
+                max_a = df["Ticket Aging"].max()
+                aging_stats.append(f"- {name}: Avg Aging {mean_a:.1f} days (Max: {max_a} days)")
+
+    owner_summary = "No owner data"
     if all_owners:
-        owner_counts = pd.Series(all_owners).value_counts().head(5)
-        top_owners = "\n".join([f"- {owner}: {count} active tickets" for owner, count in owner_counts.items()])
-    else:
-        top_owners = "No active tickets found"
+        top_owners = pd.Series(all_owners).value_counts().head(10)
+        owner_summary = "\n".join([f"- {owner}: {count} tickets" for owner, count in top_owners.items()])
+        
+    prio_summary = "No priority data"
+    if priorities:
+        prio_counts = pd.Series(priorities).value_counts()
+        prio_summary = "\n".join([f"- {prio}: {count} tickets" for prio, count in prio_counts.items()])
+
+    aging_summary = "\n".join(aging_stats) if aging_stats else "No aging data available"
     
     return {
-        'master_count': len(master_df) if master_df is not None else 0,
-        'wip_count': len(wip_df) if wip_df is not None else 0,
-        'dev_count': len(dev_df) if dev_df is not None else 0,
-        'wait_count': len(wait_df) if wait_df is not None else 0,
-        'hold_count': len(hold_df) if hold_df is not None else 0,
-        'open_count': len(open_df) if open_df is not None else 0,
-        'pending_count': len(pending_df) if pending_df is not None else 0,
-        'closed_count': len(closed_df) if closed_df is not None else 0,
-        'top_owners': top_owners
+        'counts': counts,
+        'master_count': counts['Master'],
+        'wip_count': counts['Work in Progress (WIP)'],
+        'dev_count': counts['Under Development (DEV)'],
+        'wait_count': counts['Awaiting User Info (WAIT)'],
+        'hold_count': counts['Hold'],
+        'open_count': counts['Open'],
+        'pending_count': counts['Pending'],
+        'closed_count': counts['Closed'],
+        'top_owners': owner_summary,
+        'priority_summary': prio_summary,
+        'aging_summary': aging_summary,
+        'raw_dfs': df_map
     }
+
+
+def get_chatbot_response(
+    user_question: str, 
+    data_context: Dict[str, Any],
+    history: Optional[List[Dict[str, str]]] = None
+) -> str:
+    """Get AI chatbot response for user questions about uploaded ticket Excel data."""
+    if OpenAI is None:
+        return "The OpenAI package is not installed. Please install `openai` to use the chatbot."
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return "No OpenAI API key configured. Please enter your OpenAI API key in the sidebar or `.env` file."
+
+    client: Any = OpenAI(api_key=api_key)
+
+    specific_data_matches = search_data_for_question(user_question, data_context)
+
+    counts_str = "\n".join([f"- {k}: {v} tickets" for k, v in data_context.get('counts', {}).items()])
+    
+    system_prompt = (
+        "You are an expert AI Data Assistant for the Ticket Flow Tracker system. "
+        "Your primary job is to answer user questions about the uploaded Excel ticket data with extreme precision and helpfulness.\n\n"
+        "UPLOADED EXCEL FILE OVERVIEW:\n"
+        f"{counts_str}\n\n"
+        "TOP OWNER WORKLOAD:\n"
+        f"{data_context.get('top_owners', 'N/A')}\n\n"
+        "PRIORITY DISTRIBUTION:\n"
+        f"{data_context.get('priority_summary', 'N/A')}\n\n"
+        "AGING METRICS:\n"
+        f"{data_context.get('aging_summary', 'N/A')}\n"
+        f"{specific_data_matches}\n\n"
+        "GUIDELINES:\n"
+        "- Direct, concise, accurate answer based on the Excel file summary and matches above.\n"
+        "- Use markdown formatting (bolding, bullet points, headers) for clean visual layout.\n"
+        "- If ticket numbers, owners, or specific statuses are mentioned, cite exact numbers and details."
+    )
+
+    messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+    
+    if history:
+        for msg in history[-6:]:
+            if msg.get("role") in ("user", "assistant") and msg.get("content"):
+                messages.append({"role": msg["role"], "content": msg["content"]})
+    
+    messages.append({"role": "user", "content": user_question})
+
+    try:
+        response: Any = client.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=700,
+            temperature=0.3,
+            messages=messages,
+        )
+        content = response.choices[0].message.content
+        return (content or "").strip()
+    except Exception as e:
+        return f"I encountered an error analyzing your data: {str(e)}. Please check your OpenAI API key configuration."
+
 

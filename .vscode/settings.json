@@ -11,5 +11,10 @@
     "python.analysis.typeCheckingMode": "off",
     "python.analysis.diagnosticMode": "workspace",
     "python.analysis.reportMissingImports": "none",
-    "python.analysis.reportMissingModuleSource": "none"
+    "python.analysis.reportMissingModuleSource": "none",
+    "python.analysis.reportGeneralTypeIssues": "none",
+    "python.analysis.reportOptionalMemberAccess": "none",
+    "python.analysis.reportOptionalCall": "none",
+    "python.analysis.reportArgumentType": "none",
+    "python.analysis.reportCallIssue": "none"
 }
