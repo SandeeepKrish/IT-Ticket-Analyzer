@@ -829,21 +829,25 @@ with st.sidebar:
         is_valid, validation_msg = validate_folder_upload(folder_result)
         
         if is_valid:
-            st.success("✅ All 9 files detected and validated!")
+            has_mailto = folder_result.get("mail_to") is not None
+            if has_mailto:
+                st.success("✅ All 8 ticket workflow files + Mail Directory detected and validated!")
+            else:
+                st.success("✅ All 8 ticket workflow files detected and validated!")
             summary = get_folder_upload_summary(folder_result)
             st.caption(summary)
             
             if st.button("📤 Use Folder Data", key="use_folder_data", use_container_width=True):
                 st.session_state["folder_data_loaded"] = True
-                st.session_state["master_df"] = folder_result["master"]
-                st.session_state["wip_df"] = folder_result["wip"]
-                st.session_state["dev_df"] = folder_result["dev"]
-                st.session_state["wait_df"] = folder_result["wait"]
-                st.session_state["hold_df"] = folder_result["hold"]
-                st.session_state["open_df"] = folder_result["open"]
-                st.session_state["pending_df"] = folder_result["pending"]
-                st.session_state["closed_df"] = folder_result["closed"]
-                st.session_state["mail_to_df"] = folder_result["mail_to"]
+                st.session_state["master_df"] = folder_result.get("master")
+                st.session_state["wip_df"] = folder_result.get("wip")
+                st.session_state["dev_df"] = folder_result.get("dev")
+                st.session_state["wait_df"] = folder_result.get("wait")
+                st.session_state["hold_df"] = folder_result.get("hold")
+                st.session_state["open_df"] = folder_result.get("open")
+                st.session_state["pending_df"] = folder_result.get("pending")
+                st.session_state["closed_df"] = folder_result.get("closed")
+                st.session_state["mail_to_df"] = folder_result.get("mail_to", None)
                 st.success("✅ Folder data loaded! Reloading app...")
                 st.rerun()
         else:
