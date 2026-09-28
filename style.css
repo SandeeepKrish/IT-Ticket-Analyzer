@@ -2,10 +2,15 @@
    Ticket Flow Tracker — Global Styles
    ===================================================== */
 
+:root, html, body {
+    color-scheme: light !important;
+}
+
 /* Main page styling */
 .stApp {
-    background: #ffffff;
+    background: #ffffff !important;
     min-height: 100vh;
+    color-scheme: light !important;
 }
 
 /* Header styling */
