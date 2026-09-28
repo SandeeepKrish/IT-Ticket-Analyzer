@@ -70,6 +70,7 @@
 .open-metric    { border-left: 3px solid #28a745; }
 .pending-metric { border-left: 3px solid #ffc107; }
 .closed-metric  { border-left: 3px solid #6c757d; }
+.mailto-metric  { border-left: 3px solid #20c997; }
 
 /* Compact sidebar styling */
 .sidebar .stFileUploader {
@@ -653,5 +654,111 @@ header    { visibility: hidden; }
     padding: 0.8rem 1rem !important;
     border-radius: 12px !important;
     margin-bottom: 0.6rem !important;
+}
+
+/* Reminder Dispatcher Styling */
+.reminder-dispatcher-container {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 5px solid #dc3545;
+    border-radius: 10px;
+    padding: 1.2rem;
+    margin: 1.2rem 0;
+}
+
+.reminder-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+}
+
+.reminder-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.reminder-subtitle {
+    font-size: 0.88rem;
+    color: #64748b;
+    margin-bottom: 0.8rem;
+}
+
+.reminder-card-item {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.9rem;
+    margin-bottom: 0.7rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.reminder-card-left {
+    flex: 1;
+}
+
+.reminder-ticket-badge {
+    font-weight: 600;
+    color: #0f172a;
+    font-size: 0.95rem;
+}
+
+.reminder-creator-tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-weight: 500;
+    margin-left: 0.4rem;
+}
+
+.reminder-email-tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: #dcfce7;
+    color: #15803d;
+    font-weight: 500;
+    margin-left: 0.4rem;
+}
+
+.reminder-email-missing {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-weight: 500;
+    margin-left: 0.4rem;
+}
+
+.reminder-outlook-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.8rem;
+    background: #0284c7;
+    color: #ffffff !important;
+    text-decoration: none !important;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: background 0.2s ease;
+}
+
+.reminder-outlook-link:hover {
+    background: #0369a1;
+    color: #ffffff !important;
 }
 

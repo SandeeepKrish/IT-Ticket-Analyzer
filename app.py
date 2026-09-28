@@ -11,7 +11,11 @@ Run with:  streamlit run app.py
 from __future__ import annotations
 
 import os
-from typing import Any, Set
+import smtplib
+import urllib.parse
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 import streamlit as st
@@ -179,7 +183,7 @@ def get_combined_date_filters(master_df, wip_df, dev_df, wait_df, hold_df, open_
     all_years = set()
     
     for df in [master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df]:
-        if not df.empty and "Start Date" in df.columns:
+        if df is not None and not df.empty and "Start Date" in df.columns:
             df_temp = df.copy()
             df_temp["Start Date"] = pd.to_datetime(df_temp["Start Date"], errors='coerce')
             years = df_temp["Start Date"].dt.year.dropna().unique()
@@ -358,6 +362,165 @@ def get_ticket_workflow_status(ticket_no: str, wip_df, dev_df, wait_df, hold_df,
             "color": "#6c757d",
             "next_step": "Contact support for status clarification"
         }
+
+
+# ==============================================================================
+# Email Directory & Reminder Mail Utilities
+# ==============================================================================
+def build_email_directory(mail_to_df: Optional[pd.DataFrame]) -> Dict[str, str]:
+    """
+    Extract a mapping from person/ticket creator name -> email address.
+    Supports flexible column names:
+    - Creator/Name: 'Ticket Creator', 'Name', 'User', 'Employee Name', etc.
+    - Email: 'Email', 'Email ID', 'Mail', 'Mail ID', 'Mail To', etc.
+    """
+    if mail_to_df is None or mail_to_df.empty:
+        return {}
+    
+    col_names = list(mail_to_df.columns)
+    name_col = None
+    email_col = None
+    
+    # 1. Search for name column
+    name_patterns = ["ticket creator", "creator", "employee name", "user name", "name", "user", "person", "staff", "employee"]
+    for pattern in name_patterns:
+        for c in col_names:
+            if pattern in str(c).strip().lower():
+                name_col = c
+                break
+        if name_col:
+            break
+            
+    # 2. Search for email column
+    email_patterns = ["email id", "mail id", "mail to", "email address", "email", "mail", "e-mail"]
+    for pattern in email_patterns:
+        for c in col_names:
+            if pattern in str(c).strip().lower():
+                email_col = c
+                break
+        if email_col:
+            break
+            
+    # Fallback heuristics
+    if not name_col and len(col_names) > 0:
+        name_col = col_names[0]
+    if not email_col and len(col_names) > 1:
+        for c in col_names:
+            sample_vals = mail_to_df[c].dropna().astype(str).tolist()[:10]
+            if any('@' in v for v in sample_vals):
+                email_col = c
+                break
+        if not email_col:
+            email_col = col_names[1]
+
+    if not name_col or not email_col:
+        return {}
+
+    directory: Dict[str, str] = {}
+    for _, row in mail_to_df.iterrows():
+        raw_name = str(row.get(name_col, "")).strip()
+        raw_email = str(row.get(email_col, "")).strip()
+        if raw_name and raw_email and "@" in raw_email:
+            directory[raw_name.lower()] = raw_email
+            directory[raw_name] = raw_email
+            
+    return directory
+
+
+def find_creator_email(creator_name: str, directory: Dict[str, str]) -> Optional[str]:
+    """Find email for a creator name using exact, lowercase, or partial token matching."""
+    if not creator_name or not directory:
+        return None
+        
+    c_clean = str(creator_name).strip()
+    if c_clean in directory:
+        return directory[c_clean]
+    if c_clean.lower() in directory:
+        return directory[c_clean.lower()]
+        
+    # Check partial matching (e.g., 'Sanket Tambe' matching 'Sanket' or 'sanket.tambe')
+    c_lower = c_clean.lower()
+    for key, email in directory.items():
+        if key and len(key) >= 3:
+            if key in c_lower or c_lower in key:
+                return email
+                
+    # Token check
+    tokens = [t for t in c_lower.replace('.', ' ').split() if len(t) >= 3]
+    for key, email in directory.items():
+        if any(tok in key for tok in tokens):
+            return email
+            
+    return None
+
+
+def generate_reminder_email(
+    ticket_row: pd.Series, 
+    sender_name: str = "Sandeep Yadav", 
+    company_name: str = "United Tyrekrafts Pvt. Ltd.", 
+    sender_email: str = "sandeep.yadav@unitread.co.in"
+) -> Tuple[str, str]:
+    """Generate subject and professional body for reminder email to ticket creator."""
+    ticket_no = str(ticket_row.get("Ticket Number", "")).strip()
+    subject_text = str(ticket_row.get("Subject", "")).strip()
+    creator_name = str(ticket_row.get("Ticket Creator", "User")).strip()
+    aging = ticket_row.get("Ticket Aging", 0)
+    dept = ticket_row.get("Ticket Department", "Support")
+    start_date = ticket_row.get("Start Date", "N/A")
+
+    email_subject = f"Reminder: Action Required on Ticket #{ticket_no} - {subject_text}"
+    
+    email_body = (
+        f"Dear {creator_name},\n\n"
+        f"Hi, this is {sender_name} from {company_name}.\n\n"
+        f"We are following up on your support ticket, which is currently marked 'Awaiting User Info':\n\n"
+        f"  • Ticket Number: {ticket_no}\n"
+        f"  • Subject: {subject_text}\n"
+        f"  • Department: {dept}\n"
+        f"  • Start Date: {start_date}\n"
+        f"  • Aging: {aging} days\n\n"
+        f"Please reply to your ticket so our support team can take the next steps:\n"
+        f"  1. If your problem has been RESOLVED, please confirm so we can close this ticket.\n"
+        f"  2. If the problem is NOT SOLVED, please let us know your pending questions/issues so we can solve it for you immediately.\n\n"
+        f"Thank you,\n"
+        f"{sender_name}\n"
+        f"{company_name}\n"
+        f"Email: {sender_email}\n"
+    )
+    return email_subject, email_body
+
+
+def send_smtp_email(
+    smtp_host: str, 
+    smtp_port: int, 
+    sender_email: str, 
+    sender_password: str, 
+    recipient_email: str, 
+    subject: str, 
+    body: str,
+    use_tls: bool = True
+) -> Tuple[bool, str]:
+    """Send an email using SMTP."""
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                if use_tls:
+                    server.starttls()
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+        return True, "Sent successfully"
+    except Exception as e:
+        return False, str(e)
 
 
 def display_workflow_diagram():
@@ -562,7 +725,7 @@ def related_list(df: pd.DataFrame, owner: str, exclude_ticket: str, empty_msg: s
     st.markdown('</div>', unsafe_allow_html=True)
 
 
-def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df):
+def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, mail_to_df=None):
     """Render an AI ticket assistant chat box that answers questions about uploaded Excel files."""
     st.divider()
     st.markdown('<div class="chat-assistant-wrapper">', unsafe_allow_html=True)
@@ -591,7 +754,8 @@ def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_d
         hold_df=hold_df,
         open_df=open_df,
         pending_df=pending_df,
-        closed_df=closed_df
+        closed_df=closed_df,
+        mail_to_df=mail_to_df
     )
 
     if "chatbot_messages" not in st.session_state:
@@ -650,14 +814,14 @@ with st.sidebar:
     
     # ============ FAST FOLDER UPLOAD (NEW!) ============
     st.markdown("### ⚡ Fast Folder Upload (New!)")
-    st.caption("Upload a folder containing all 8 Excel files. Files are auto-detected by name and mapped to their categories.")
+    st.caption("Upload a folder containing all 9 Excel files. Files are auto-detected by name and mapped to their categories.")
     
     folder_files = st.file_uploader(
         "📁 Select all Excel files from your folder",
         type="xlsx",
         accept_multiple_files=True,
         key="folder_upload",
-        help="Upload all 8 files at once. Files will be auto-detected by filename (e.g., master_file.xlsx, hold_file.xlsx, etc.)"
+        help="Upload all 9 files at once. Files will be auto-detected by filename (e.g., master_file.xlsx, mail_to.xlsx, etc.)"
     )
     
     if folder_files:
@@ -665,7 +829,7 @@ with st.sidebar:
         is_valid, validation_msg = validate_folder_upload(folder_result)
         
         if is_valid:
-            st.success("✅ All 8 files detected and validated!")
+            st.success("✅ All 9 files detected and validated!")
             summary = get_folder_upload_summary(folder_result)
             st.caption(summary)
             
@@ -679,6 +843,7 @@ with st.sidebar:
                 st.session_state["open_df"] = folder_result["open"]
                 st.session_state["pending_df"] = folder_result["pending"]
                 st.session_state["closed_df"] = folder_result["closed"]
+                st.session_state["mail_to_df"] = folder_result["mail_to"]
                 st.success("✅ Folder data loaded! Reloading app...")
                 st.rerun()
         else:
@@ -693,29 +858,33 @@ with st.sidebar:
     
     with col1:
         st.markdown("**📋 MASTER**")
-        master_file = st.file_uploader("", type="xlsx", key="master", help="Master ticket list - all tickets")
+        master_file = st.file_uploader("Master Ticket List", type="xlsx", key="master", label_visibility="collapsed", help="Master ticket list - all tickets")
         
         st.markdown("**📊 WIP**")
-        wip_file = st.file_uploader("", type="xlsx", key="wip", help="Work in Progress tickets")
+        wip_file = st.file_uploader("Work in Progress", type="xlsx", key="wip", label_visibility="collapsed", help="Work in Progress tickets")
         
         st.markdown("**🔧 DEV**")
-        dev_file = st.file_uploader("", type="xlsx", key="dev", help="Under Development tickets")
+        dev_file = st.file_uploader("Under Development", type="xlsx", key="dev", label_visibility="collapsed", help="Under Development tickets")
         
         st.markdown("**⚠️ WAIT**")
-        wait_file = st.file_uploader("", type="xlsx", key="wait", help="Awaiting User Info tickets")
+        wait_file = st.file_uploader("Awaiting User Info", type="xlsx", key="wait", label_visibility="collapsed", help="Awaiting User Info tickets")
     
     with col2:
         st.markdown("**⏸️ HOLD**")
-        hold_file = st.file_uploader("", type="xlsx", key="hold", help="Hold tickets")
+        hold_file = st.file_uploader("Hold Tickets", type="xlsx", key="hold", label_visibility="collapsed", help="Hold tickets")
         
         st.markdown("**🟢 OPEN**")
-        open_file = st.file_uploader("", type="xlsx", key="open", help="Open tickets")
+        open_file = st.file_uploader("Open Tickets", type="xlsx", key="open", label_visibility="collapsed", help="Open tickets")
         
         st.markdown("**🟠 PENDING**")
-        pending_file = st.file_uploader("", type="xlsx", key="pending", help="Pending tickets")
+        pending_file = st.file_uploader("Pending Tickets", type="xlsx", key="pending", label_visibility="collapsed", help="Pending tickets")
         
         st.markdown("**⚫ CLOSED**")
-        closed_file = st.file_uploader("", type="xlsx", key="closed", help="Closed tickets")
+        closed_file = st.file_uploader("Closed Tickets", type="xlsx", key="closed", label_visibility="collapsed", help="Closed tickets")
+
+    st.markdown("**✉️ MAIL TO (Email Directory)**")
+    st.caption("Upload mapping file (Ticket Creator → Email ID, e.g. Sanket Tambe → sanket.tambe@unitread.co.in)")
+    mail_to_file = st.file_uploader("Mail Directory Mapping", type=["xlsx", "xls", "csv"], key="mail_to", label_visibility="collapsed", help="Excel/CSV mapping Ticket Creators to their Email IDs")
 
     st.divider()
     st.markdown('<div class="sidebar-header">🤖 AI Assistant</div>', unsafe_allow_html=True)
@@ -751,6 +920,7 @@ if use_folder_data:
     open_df = st.session_state.get("open_df")
     pending_df = st.session_state.get("pending_df")
     closed_df = st.session_state.get("closed_df")
+    mail_to_df = st.session_state.get("mail_to_df", None)
 
     if any(df is None for df in [master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df]):
         st.markdown("""
@@ -782,7 +952,7 @@ else:
         render_footer()
         st.stop()
 
-    # Load all 8 files including master
+    # Load 8 core workflow files
     master_df = load_excel(master_file)
     wip_df = load_excel(wip_file)
     dev_df = load_excel(dev_file) 
@@ -791,8 +961,9 @@ else:
     open_df = load_excel(open_file)
     pending_df = load_excel(pending_file)
     closed_df = load_excel(closed_file)
+    mail_to_df = load_excel(mail_to_file) if mail_to_file is not None else st.session_state.get("mail_to_df", None)
 
-# Validate all files have required columns
+# Validate the 8 core ticket workflow files have required columns
 files_to_validate = [
     (master_df, "Master Ticket List"),
     (wip_df, "Work in Progress"),
@@ -808,7 +979,7 @@ for df, label in files_to_validate:
     if not validate_columns(df, label):
         st.stop()
 
-# Enhanced metrics display for all categories + master
+# Enhanced metrics display for all 8 categories
 st.markdown(f"""
 <div class="metric-container">
     <div class="metric-card" style="border-left: 3px solid #17a2b8;">
@@ -1065,13 +1236,13 @@ with tab0:
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(master_df["Ticket Owner"].dropna().unique().tolist())
-        master_owner_filter = st.selectbox("", owners, key="master_owner_filter", label_visibility="collapsed")
+        master_owner_filter = st.selectbox("Master Owner", owners, key="master_owner_filter", label_visibility="collapsed")
     with col2:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
-        master_year_filter = st.selectbox("", available_years, key="master_year_filter", label_visibility="collapsed")
+        master_year_filter = st.selectbox("Master Year", available_years, key="master_year_filter", label_visibility="collapsed")
     with col3:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
-        master_month_filter = st.selectbox("", available_months, key="master_month_filter", label_visibility="collapsed")
+        master_month_filter = st.selectbox("Master Month", available_months, key="master_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
     display_filter_results(master_df, "Master List", master_owner_filter, master_year_filter, master_month_filter, "#17a2b8")
@@ -1089,13 +1260,13 @@ with tab1:
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(wip_df["Ticket Owner"].dropna().unique().tolist())
-        wip_owner_filter = st.selectbox("", owners, key="wip_owner_filter", label_visibility="collapsed")
+        wip_owner_filter = st.selectbox("WIP Owner", owners, key="wip_owner_filter", label_visibility="collapsed")
     with col2:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
-        wip_year_filter = st.selectbox("", available_years, key="wip_year_filter", label_visibility="collapsed")
+        wip_year_filter = st.selectbox("WIP Year", available_years, key="wip_year_filter", label_visibility="collapsed")
     with col3:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
-        wip_month_filter = st.selectbox("", available_months, key="wip_month_filter", label_visibility="collapsed")
+        wip_month_filter = st.selectbox("WIP Month", available_months, key="wip_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
     display_filter_results(wip_df, "Work in Progress", wip_owner_filter, wip_year_filter, wip_month_filter, "#007bff")
@@ -1113,13 +1284,13 @@ with tab2:
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(dev_df["Ticket Owner"].dropna().unique().tolist())
-        dev_owner_filter = st.selectbox("", owners, key="dev_owner_filter", label_visibility="collapsed")
+        dev_owner_filter = st.selectbox("Dev Owner", owners, key="dev_owner_filter", label_visibility="collapsed")
     with col2:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
-        dev_year_filter = st.selectbox("", available_years, key="dev_year_filter", label_visibility="collapsed")
+        dev_year_filter = st.selectbox("Dev Year", available_years, key="dev_year_filter", label_visibility="collapsed")
     with col3:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
-        dev_month_filter = st.selectbox("", available_months, key="dev_month_filter", label_visibility="collapsed")
+        dev_month_filter = st.selectbox("Dev Month", available_months, key="dev_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
     display_filter_results(dev_df, "Under Development", dev_owner_filter, dev_year_filter, dev_month_filter, "#fd7e14")
@@ -1137,13 +1308,13 @@ with tab3:
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(wait_df["Ticket Owner"].dropna().unique().tolist())
-        wait_owner_filter = st.selectbox("", owners, key="wait_owner_filter", label_visibility="collapsed")
+        wait_owner_filter = st.selectbox("Wait Owner", owners, key="wait_owner_filter", label_visibility="collapsed")
     with col2:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
-        wait_year_filter = st.selectbox("", available_years, key="wait_year_filter", label_visibility="collapsed")
+        wait_year_filter = st.selectbox("Wait Year", available_years, key="wait_year_filter", label_visibility="collapsed")
     with col3:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
-        wait_month_filter = st.selectbox("", available_months, key="wait_month_filter", label_visibility="collapsed")
+        wait_month_filter = st.selectbox("Wait Month", available_months, key="wait_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
     display_filter_results(wait_df, "Awaiting User Info", wait_owner_filter, wait_year_filter, wait_month_filter, "#dc3545")
@@ -1151,8 +1322,173 @@ with tab3:
     # Display user statistics if specific owner is selected
     display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, wait_owner_filter, wait_year_filter, wait_month_filter)
     
-    # Filter and display data
     wait_view = get_filtered_data(wait_df, wait_owner_filter, wait_year_filter, wait_month_filter)
+
+    # =========================================================================
+    # 📢 TICKET CREATOR REMINDER DISPATCHER
+    # =========================================================================
+    email_directory = build_email_directory(mail_to_df)
+    
+    st.markdown("""
+    <div class="reminder-dispatcher-container">
+        <div class="reminder-header-row">
+            <div class="reminder-title">
+                <span>📢 Ticket Creator Reminder Dispatcher</span>
+            </div>
+        </div>
+        <div class="reminder-subtitle">
+            Send follow-up reminders to creators so ticket owners can get replies and move tickets forward or close them.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Show Email Directory Connection Status
+    if email_directory:
+        st.success(f"✅ **Mail Directory Active**: {len(email_directory)} creator emails mapped from Mail To file.")
+        with st.expander(f"📋 View Email Directory Mappings ({len(email_directory)} entries)", expanded=False):
+            mapping_rows = [{"Creator / Name": k, "Email Address": v} for k, v in list(email_directory.items()) if k == k.lower()]
+            if mapping_rows:
+                st.dataframe(pd.DataFrame(mapping_rows), use_container_width=True, hide_index=True)
+    else:
+        st.warning("⚠️ **Mail Directory Not Loaded**: Please upload your **Mail To** file in the sidebar to auto-match each ticket creator's email address.")
+
+    # Sender and Email Dispatch Settings
+    with st.expander("⚙️ Sender & Email Settings (Defaults: Sandeep Yadav | United Tyrekrafts)", expanded=False):
+        c_set1, c_set2 = st.columns(2)
+        with c_set1:
+            cfg_sender_name = st.text_input("Sender Name", value="Sandeep Yadav", key="rem_sender_name")
+            cfg_sender_company = st.text_input("Company Name", value="United Tyrekrafts Pvt. Ltd.", key="rem_sender_company")
+            cfg_sender_email = st.text_input("Sender Email Address", value="sandeep.yadav@unitread.co.in", key="rem_sender_email")
+        with c_set2:
+            cfg_smtp_host = st.text_input("SMTP Server (for direct 1-click background sending)", value=os.environ.get("SMTP_HOST", "smtp.office365.com"), key="rem_smtp_host")
+            cfg_smtp_port = st.number_input("SMTP Port", value=int(os.environ.get("SMTP_PORT", 587)), step=1, key="rem_smtp_port")
+            cfg_smtp_password = st.text_input("SMTP / App Password (Optional)", type="password", value=os.environ.get("SMTP_PASSWORD", ""), key="rem_smtp_password", help="Enter app password to send directly in background without opening Outlook")
+
+    # Match tickets with emails
+    reminder_list: List[Dict[str, Any]] = []
+    for _, r in wait_view.iterrows():
+        creator_val = str(r.get("Ticket Creator", "")).strip()
+        matched_email = find_creator_email(creator_val, email_directory)
+        sub_text, body_text = generate_reminder_email(r, cfg_sender_name, cfg_sender_company, cfg_sender_email)
+        
+        mailto_url = ""
+        if matched_email:
+            encoded_sub = urllib.parse.quote(sub_text)
+            encoded_body = urllib.parse.quote(body_text)
+            mailto_url = f"mailto:{matched_email}?subject={encoded_sub}&body={encoded_body}"
+            
+        reminder_list.append({
+            "ticket_no": r.get("Ticket Number", ""),
+            "creator": creator_val,
+            "matched_email": matched_email,
+            "subject": r.get("Subject", ""),
+            "aging": r.get("Ticket Aging", 0),
+            "department": r.get("Ticket Department", "Support"),
+            "email_subject": sub_text,
+            "email_body": body_text,
+            "mailto_url": mailto_url,
+            "raw_row": r
+        })
+
+    matched_count = sum(1 for item in reminder_list if item["matched_email"])
+    unmatched_count = len(reminder_list) - matched_count
+
+    # Bulk Action Bar
+    rcol1, rcol2, rcol3 = st.columns([2, 1, 1])
+    with rcol1:
+        st.markdown(f"**Tickets in view:** `{len(reminder_list)}` | **Emails Matched:** `{matched_count}` | **Missing Email:** `{unmatched_count}`")
+    with rcol2:
+        send_all_btn = st.button("🚀 Send All Reminders (Single Click)", type="primary", use_container_width=True, key="btn_send_all_reminders")
+    with rcol3:
+        show_preview = st.checkbox("Show Email Cards", value=True, key="chk_show_reminder_preview")
+
+    # Handle Send All Click
+    if send_all_btn:
+        if not reminder_list:
+            st.info("No tickets in current view to send reminders for.")
+        elif not cfg_smtp_password:
+            st.warning(
+                f"🔑 **SMTP Password Needed for Bulk Background Sending**\n\n"
+                f"To send emails automatically in the background from `{cfg_sender_email}`, please expand **'⚙️ Sender & Email Settings'** above and enter your email/app password.\n\n"
+                f"💡 **Immediate Alternative**: Click the **'✉️ Send via Outlook'** button next to any ticket below to open it pre-filled in your mail client with 1 click!"
+            )
+        else:
+            with st.spinner(f"Sending reminders from {cfg_sender_email}..."):
+                sent_success = 0
+                sent_failed = 0
+                error_msgs = []
+                progress_bar = st.progress(0)
+                
+                for idx, item in enumerate(reminder_list):
+                    recipient = item["matched_email"]
+                    if recipient:
+                        ok, msg = send_smtp_email(
+                            smtp_host=cfg_smtp_host,
+                            smtp_port=int(cfg_smtp_port),
+                            sender_email=cfg_sender_email,
+                            sender_password=cfg_smtp_password,
+                            recipient_email=recipient,
+                            subject=item["email_subject"],
+                            body=item["email_body"]
+                        )
+                        if ok:
+                            sent_success += 1
+                        else:
+                            sent_failed += 1
+                            error_msgs.append(f"{item['ticket_no']} ({recipient}): {msg}")
+                    else:
+                        sent_failed += 1
+                        error_msgs.append(f"{item['ticket_no']} ({item['creator']}): No email address found")
+                    
+                    progress_bar.progress((idx + 1) / len(reminder_list))
+                
+                if sent_success > 0:
+                    st.success(f"🎉 **Completed**: Successfully sent {sent_success} reminder emails from {cfg_sender_email}!")
+                if sent_failed > 0:
+                    st.error(f"⚠️ {sent_failed} email(s) could not be sent:")
+                    for err in error_msgs[:5]:
+                        st.caption(f"- {err}")
+
+    # Reminder Cards / Direct Outlook buttons
+    if show_preview and reminder_list:
+        st.markdown("#### 📬 Ticket Follow-Up Queue")
+        for item in reminder_list:
+            t_num = item["ticket_no"]
+            creator = item["creator"]
+            matched_addr = item["matched_email"]
+            t_subj = item["subject"]
+            aging = item["aging"]
+            mailto_link = item["mailto_url"]
+            
+            c_left, c_right = st.columns([4, 1.2])
+            with c_left:
+                email_badge = f'<span class="reminder-email-tag">✉️ {matched_addr}</span>' if matched_addr else '<span class="reminder-email-missing">⚠️ Email not found in directory</span>'
+                st.markdown(f"""
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.8rem; margin: 0.4rem 0;">
+                    <div>
+                        <strong>🎫 {t_num}</strong> — {t_subj}
+                    </div>
+                    <div style="font-size: 0.85rem; color: #475569; margin-top: 0.3rem;">
+                        👤 Creator: <strong>{creator}</strong> {email_badge} • ⏱️ {aging} days
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            with c_right:
+                if mailto_link:
+                    st.markdown(f"""
+                    <div style="margin-top: 0.6rem;">
+                        <a href="{mailto_link}" class="reminder-outlook-link" target="_blank">✉️ Send via Outlook</a>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.caption("No email mapped")
+
+            with st.expander(f"📄 Preview Message for {t_num} ({creator})", expanded=False):
+                st.text_area("Subject", item["email_subject"], key=f"subj_{t_num}", height=68, disabled=True)
+                st.text_area("Body", item["email_body"], key=f"body_{t_num}", height=180, disabled=True)
+
+    st.divider()
+    st.markdown("#### 📋 Awaiting User Info Tickets Table")
     st.dataframe(wait_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 with tab4:
@@ -1161,13 +1497,13 @@ with tab4:
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(hold_df["Ticket Owner"].dropna().unique().tolist())
-        hold_owner_filter = st.selectbox("", owners, key="hold_owner_filter", label_visibility="collapsed")
+        hold_owner_filter = st.selectbox("Hold Owner", owners, key="hold_owner_filter", label_visibility="collapsed")
     with col2:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
-        hold_year_filter = st.selectbox("", available_years, key="hold_year_filter", label_visibility="collapsed")
+        hold_year_filter = st.selectbox("Hold Year", available_years, key="hold_year_filter", label_visibility="collapsed")
     with col3:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
-        hold_month_filter = st.selectbox("", available_months, key="hold_month_filter", label_visibility="collapsed")
+        hold_month_filter = st.selectbox("Hold Month", available_months, key="hold_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
     display_filter_results(hold_df, "Hold", hold_owner_filter, hold_year_filter, hold_month_filter, "#6f42c1")
@@ -1185,13 +1521,13 @@ with tab5:
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(open_df["Ticket Owner"].dropna().unique().tolist())
-        open_owner_filter = st.selectbox("", owners, key="open_owner_filter", label_visibility="collapsed")
+        open_owner_filter = st.selectbox("Open Owner", owners, key="open_owner_filter", label_visibility="collapsed")
     with col2:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
-        open_year_filter = st.selectbox("", available_years, key="open_year_filter", label_visibility="collapsed")
+        open_year_filter = st.selectbox("Open Year", available_years, key="open_year_filter", label_visibility="collapsed")
     with col3:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
-        open_month_filter = st.selectbox("", available_months, key="open_month_filter", label_visibility="collapsed")
+        open_month_filter = st.selectbox("Open Month", available_months, key="open_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
     display_filter_results(open_df, "Open", open_owner_filter, open_year_filter, open_month_filter, "#28a745")
@@ -1209,13 +1545,13 @@ with tab6:
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(pending_df["Ticket Owner"].dropna().unique().tolist())
-        pending_owner_filter = st.selectbox("", owners, key="pending_owner_filter", label_visibility="collapsed")
+        pending_owner_filter = st.selectbox("Pending Owner", owners, key="pending_owner_filter", label_visibility="collapsed")
     with col2:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
-        pending_year_filter = st.selectbox("", available_years, key="pending_year_filter", label_visibility="collapsed")
+        pending_year_filter = st.selectbox("Pending Year", available_years, key="pending_year_filter", label_visibility="collapsed")
     with col3:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
-        pending_month_filter = st.selectbox("", available_months, key="pending_month_filter", label_visibility="collapsed")
+        pending_month_filter = st.selectbox("Pending Month", available_months, key="pending_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
     display_filter_results(pending_df, "Pending", pending_owner_filter, pending_year_filter, pending_month_filter, "#ffc107")
@@ -1233,13 +1569,13 @@ with tab7:
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(closed_df["Ticket Owner"].dropna().unique().tolist())
-        closed_owner_filter = st.selectbox("", owners, key="closed_owner_filter", label_visibility="collapsed")
+        closed_owner_filter = st.selectbox("Closed Owner", owners, key="closed_owner_filter", label_visibility="collapsed")
     with col2:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
-        closed_year_filter = st.selectbox("", available_years, key="closed_year_filter", label_visibility="collapsed")
+        closed_year_filter = st.selectbox("Closed Year", available_years, key="closed_year_filter", label_visibility="collapsed")
     with col3:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
-        closed_month_filter = st.selectbox("", available_months, key="closed_month_filter", label_visibility="collapsed")
+        closed_month_filter = st.selectbox("Closed Month", available_months, key="closed_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
     display_filter_results(closed_df, "Closed", closed_owner_filter, closed_year_filter, closed_month_filter, "#6c757d")
@@ -1252,6 +1588,6 @@ with tab7:
     st.dataframe(closed_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 # ---------------------------------------------------------------- AI Assistant & Footer
-render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df)
+render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, mail_to_df)
 render_footer()
 

@@ -51,6 +51,7 @@ def detect_file_type(filename: str) -> Optional[str]:
         (['open'], 'open'),
         (['pending'], 'pending'),
         (['closed', 'close'], 'closed'),  # Matches both "closed" and "close"
+        (['mailto', 'mail_to', 'mail'], 'mail_to'),  # Matches "mailto", "mail_to", "mail"
     ]
     
     # Check each category
@@ -75,9 +76,10 @@ def process_folder_upload(uploaded_files: List[Any]) -> Dict[str, Any]:
     - Open
     - Pending
     - Closed
+    - Mail To or Mail To Analysis
     
     Returns:
-        dict: Mapped dataframes with keys: master, wip, dev, wait, hold, open, pending, closed
+        dict: Mapped dataframes with keys: master, wip, dev, wait, hold, open, pending, closed, mail_to
     """
     result: Dict[str, Any] = {
         'master': None,
@@ -88,6 +90,7 @@ def process_folder_upload(uploaded_files: List[Any]) -> Dict[str, Any]:
         'open': None,
         'pending': None,
         'closed': None,
+        'mail_to': None,
         'detected_files': [],
         'unrecognized_files': []
     }
@@ -131,7 +134,8 @@ def process_folder_upload(uploaded_files: List[Any]) -> Dict[str, Any]:
 
 def validate_folder_upload(folder_result: Dict[str, Any]) -> Tuple[bool, str]:
     """
-    Validate that all required files were detected and loaded.
+    Validate that all 8 required ticket stage files were detected and loaded.
+    Mail To is recognized as the companion email directory.
     
     Returns:
         tuple: (is_valid, message)
@@ -141,9 +145,12 @@ def validate_folder_upload(folder_result: Dict[str, Any]) -> Tuple[bool, str]:
     
     if missing_files:
         missing_display = ', '.join([key.upper() for key in missing_files])
-        return False, f"Missing files for: {missing_display}. Please ensure all 8 files are included."
+        return False, f"Missing ticket stage files for: {missing_display}. Please ensure all 8 ticket reports are included."
     
-    return True, "All files loaded successfully!"
+    msg = "All 8 ticket workflow files loaded successfully!"
+    if folder_result.get('mail_to') is not None:
+        msg += f" (✉️ Mail Directory loaded with {len(folder_result['mail_to'])} contacts)"
+    return True, msg
 
 
 def get_folder_upload_summary(folder_result: Dict[str, Any]) -> str:
@@ -260,6 +267,7 @@ def generate_data_context(
     open_df: Optional[pd.DataFrame] = None,
     pending_df: Optional[pd.DataFrame] = None,
     closed_df: Optional[pd.DataFrame] = None,
+    mail_to_df: Optional[pd.DataFrame] = None,
 ) -> Dict[str, Any]:
     """Generate comprehensive context about the current data for the chatbot"""
     df_map = {
@@ -271,6 +279,7 @@ def generate_data_context(
         'Open': open_df,
         'Pending': pending_df,
         'Closed': closed_df,
+        'Mail To Analysis': mail_to_df,
     }
     
     counts = {name: (len(df) if df is not None and not df.empty else 0) for name, df in df_map.items()}
@@ -312,6 +321,7 @@ def generate_data_context(
         'open_count': counts['Open'],
         'pending_count': counts['Pending'],
         'closed_count': counts['Closed'],
+        'mail_to_count': counts['Mail To Analysis'],
         'top_owners': owner_summary,
         'priority_summary': prio_summary,
         'aging_summary': aging_summary,
