@@ -38,20 +38,21 @@
 
 /* Metric cards */
 .metric-container {
-    display: flex;
-    gap: 1rem;
-    margin: 2rem 0;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+    width: 100%;
 }
 
 .metric-card {
     background: #f8f9fa;
-    padding: 1.2rem;
+    padding: clamp(0.75rem, 1.5vw, 1.2rem);
     border-radius: 8px;
     text-align: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
     border: 1px solid #dee2e6;
-    min-width: 160px;
+    min-width: 0;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -151,8 +152,8 @@
 
 .ticket-info-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.8rem;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
     margin-bottom: 1rem;
 }
 
@@ -520,7 +521,7 @@ header    { visibility: hidden; }
 
 .monthly-breakdown-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
     gap: 0.5rem;
     margin-top: 0.5rem;
 }
@@ -859,4 +860,204 @@ header    { visibility: hidden; }
     color: #475569;
     margin-bottom: 1.2rem;
 }
+
+/* =====================================================
+   Responsive Design Breakpoints (Laptops, Tablets, Mobile)
+   ===================================================== */
+
+/* Global container fluid sizing */
+.block-container {
+    padding-top: 1.25rem !important;
+    padding-bottom: 3rem !important;
+    padding-left: clamp(0.75rem, 3vw, 2.5rem) !important;
+    padding-right: clamp(0.75rem, 3vw, 2.5rem) !important;
+    max-width: 100% !important;
+}
+
+/* Laptops & Tablets Landscape (<= 1024px) */
+@media screen and (max-width: 1024px) {
+    .metric-container {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.6rem;
+    }
+    
+    .ticket-info-grid {
+        grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+    }
+    
+    .status-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .workflow-branches {
+        flex-direction: row;
+        justify-content: center;
+    }
+}
+
+/* Tablets Portrait (<= 768px) */
+@media screen and (max-width: 768px) {
+    .main-title {
+        font-size: 1.45rem !important;
+    }
+    
+    .metric-container {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+    }
+    
+    .metric-card {
+        padding: 0.6rem 0.4rem;
+    }
+    
+    .metric-value {
+        font-size: 1.4rem;
+        margin-bottom: 0.2rem;
+    }
+    
+    .metric-label {
+        font-size: 0.7rem;
+    }
+
+    .demo-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.6rem;
+        padding: 0.75rem;
+    }
+
+    .demo-banner-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+        font-size: 0.85rem;
+    }
+    
+    .ticket-card {
+        padding: 1rem;
+    }
+    
+    .ticket-header {
+        font-size: 1.1rem;
+    }
+    
+    .ticket-info-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+    }
+
+    .monthly-breakdown-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem !important;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        padding: 0.35rem 0.65rem !important;
+        font-size: 0.8rem !important;
+    }
+    
+    .workflow-steps, .workflow-branches {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .workflow-arrow {
+        transform: rotate(90deg);
+        margin: 0.4rem 0;
+    }
+
+    .reminder-dispatcher-container {
+        padding: 0.85rem;
+    }
+
+    .reminder-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .chat-header-title {
+        font-size: 1rem;
+    }
+}
+
+/* Mobile Phones (<= 480px) */
+@media screen and (max-width: 480px) {
+    .metric-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.45rem;
+        margin: 1rem 0;
+    }
+
+    .metric-card {
+        padding: 0.5rem 0.3rem;
+        border-radius: 6px;
+    }
+
+    .metric-value {
+        font-size: 1.25rem;
+    }
+
+    .metric-label {
+        font-size: 0.65rem;
+        letter-spacing: 0.2px;
+    }
+
+    .main-header {
+        padding: 1rem 0;
+        margin-bottom: 1rem;
+    }
+
+    .main-title {
+        font-size: 1.3rem !important;
+    }
+
+    .ticket-info-grid {
+        grid-template-columns: 1fr;
+        gap: 0.4rem;
+    }
+
+    .monthly-breakdown-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .welcome-quickstart-card {
+        padding: 1rem;
+    }
+
+    .welcome-quickstart-title {
+        font-size: 1.05rem;
+    }
+
+    .welcome-quickstart-sub {
+        font-size: 0.82rem;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        padding: 0.3rem 0.5rem !important;
+        font-size: 0.75rem !important;
+    }
+
+    .reminder-title {
+        font-size: 1rem;
+    }
+
+    .footer-container {
+        padding: 0.8rem;
+    }
+
+    .footer-text {
+        font-size: 0.8rem;
+    }
+}
+
 
