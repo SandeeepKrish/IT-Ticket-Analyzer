@@ -52,12 +52,19 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     border: 1px solid #dee2e6;
     min-width: 160px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
 .metric-value {
     font-size: 2rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
+    font-variant-numeric: tabular-nums;
 }
 
 .metric-label {

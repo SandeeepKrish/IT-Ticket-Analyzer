@@ -830,45 +830,142 @@ for df, label in files_to_validate:
     if not validate_columns(df, label):
         st.stop()
 
-# Enhanced metrics display for all 8 categories
-st.markdown(f"""
+# Enhanced metrics display for all 8 categories with fast count-up animation
+st.html(f"""
 <div class="metric-container">
     <div class="metric-card" style="border-left: 3px solid #17a2b8;">
-        <div class="metric-value" style="color: #17a2b8;">{len(master_df)}</div>
+        <div class="metric-value counter-value" data-target="{len(master_df)}" style="color: #17a2b8;">{len(master_df)}</div>
         <div class="metric-label">Master List</div>
     </div>
     <div class="metric-card wip-metric">
-        <div class="metric-value" style="color: #007bff;">{len(wip_df)}</div>
+        <div class="metric-value counter-value" data-target="{len(wip_df)}" style="color: #007bff;">{len(wip_df)}</div>
         <div class="metric-label">Work in Progress</div>
     </div>
     <div class="metric-card dev-metric">
-        <div class="metric-value" style="color: #fd7e14;">{len(dev_df)}</div>
+        <div class="metric-value counter-value" data-target="{len(dev_df)}" style="color: #fd7e14;">{len(dev_df)}</div>
         <div class="metric-label">Under Development</div>
     </div>
     <div class="metric-card wait-metric">
-        <div class="metric-value" style="color: #dc3545;">{len(wait_df)}</div>
+        <div class="metric-value counter-value" data-target="{len(wait_df)}" style="color: #dc3545;">{len(wait_df)}</div>
         <div class="metric-label">Awaiting User Info</div>
     </div>
 </div>
 <div class="metric-container">
     <div class="metric-card hold-metric">
-        <div class="metric-value" style="color: #6f42c1;">{len(hold_df)}</div>
+        <div class="metric-value counter-value" data-target="{len(hold_df)}" style="color: #6f42c1;">{len(hold_df)}</div>
         <div class="metric-label">Hold</div>
     </div>
     <div class="metric-card open-metric">
-        <div class="metric-value" style="color: #28a745;">{len(open_df)}</div>
+        <div class="metric-value counter-value" data-target="{len(open_df)}" style="color: #28a745;">{len(open_df)}</div>
         <div class="metric-label">Open</div>
     </div>
     <div class="metric-card pending-metric">
-        <div class="metric-value" style="color: #ffc107; text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">{len(pending_df)}</div>
+        <div class="metric-value counter-value" data-target="{len(pending_df)}" style="color: #ffc107; text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">{len(pending_df)}</div>
         <div class="metric-label">Pending</div>
     </div>
     <div class="metric-card closed-metric">
-        <div class="metric-value" style="color: #6c757d;">{len(closed_df)}</div>
+        <div class="metric-value counter-value" data-target="{len(closed_df)}" style="color: #6c757d;">{len(closed_df)}</div>
         <div class="metric-label">Closed</div>
     </div>
 </div>
-""", unsafe_allow_html=True)
+
+<script>
+(function() {{
+    let userHasScrolled = false;
+    const releaseScroll = () => {{ 
+        userHasScrolled = true;
+        if (window._lockTopInterval) {{
+            clearInterval(window._lockTopInterval);
+            window._lockTopInterval = null;
+        }}
+    }};
+
+    window.addEventListener('wheel', releaseScroll, {{ passive: true }});
+    window.addEventListener('touchmove', releaseScroll, {{ passive: true }});
+    window.addEventListener('keydown', (e) => {{
+        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Space', 'Home', 'End'].includes(e.code)) {{
+            releaseScroll();
+        }}
+    }}, {{ passive: true }});
+
+    // Intercept programmatic scrollIntoView so lower elements don't yank the viewport down
+    if (!window._origScrollIntoView) {{
+        window._origScrollIntoView = Element.prototype.scrollIntoView;
+        Element.prototype.scrollIntoView = function() {{
+            if (!userHasScrolled) return;
+            return window._origScrollIntoView.apply(this, arguments);
+        }};
+    }}
+
+    function lockTop() {{
+        if (userHasScrolled) return;
+        const main = document.querySelector('section.main') || document.querySelector('.stAppViewContainer');
+        if (main && main.scrollTop > 0) main.scrollTop = 0;
+        if (document.documentElement && document.documentElement.scrollTop > 0) document.documentElement.scrollTop = 0;
+        if (document.body && document.body.scrollTop > 0) document.body.scrollTop = 0;
+        if (window.scrollY > 0) window.scrollTo(0, 0);
+    }}
+
+    // Keep viewport anchored to top continuously for 3.5 seconds across page hydration
+    if (window._lockTopInterval) clearInterval(window._lockTopInterval);
+    window._lockTopInterval = setInterval(lockTop, 25);
+    setTimeout(() => {{
+        if (window._lockTopInterval) {{
+            clearInterval(window._lockTopInterval);
+            window._lockTopInterval = null;
+        }}
+    }}, 3500);
+
+    function animateCounters() {{
+        const counters = document.querySelectorAll('.counter-value[data-target]');
+        if (!counters || !counters.length) return;
+
+        lockTop();
+
+        counters.forEach(counter => {{
+            const target = parseInt(counter.getAttribute('data-target'), 10) || 0;
+            if (counter._animating) return;
+            counter._animating = true;
+
+            if (target <= 1) {{
+                counter.textContent = target;
+                delete counter._animating;
+                return;
+            }}
+
+            const startVal = 1;
+            const duration = 850; // fast, energetic ~0.85s count-up
+            const startTime = performance.now();
+
+            function step(currentTime) {{
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                // Ease-out cubic: fast acceleration, smooth settle
+                const ease = 1 - Math.pow(1 - progress, 3);
+                const current = Math.floor(startVal + ease * (target - startVal));
+
+                counter.textContent = current;
+
+                if (progress < 1) {{
+                    requestAnimationFrame(step);
+                }} else {{
+                    counter.textContent = target;
+                    delete counter._animating;
+                    lockTop();
+                }}
+            }}
+
+            counter.textContent = startVal;
+            requestAnimationFrame(step);
+        }});
+    }}
+
+    animateCounters();
+    requestAnimationFrame(animateCounters);
+    setTimeout(animateCounters, 60);
+}})();
+</script>
+""", unsafe_allow_javascript=True)
 
 # Get combined date filters for global use
 available_years, available_months = get_combined_date_filters(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df)
