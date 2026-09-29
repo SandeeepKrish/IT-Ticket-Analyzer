@@ -810,7 +810,6 @@ with st.sidebar:
 st.markdown("""
 <div class="main-header">
     <div class="main-title">🎫 Ticket Flow Tracker</div>
-    <div class="main-subtitle">Work in Progress → Under Development → Awaiting User Info, mapped by owner so nothing sits stuck</div>
 </div>
 """, unsafe_allow_html=True)
 
