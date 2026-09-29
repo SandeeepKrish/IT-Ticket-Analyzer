@@ -12,12 +12,11 @@ def render_footer() -> None:
     st.markdown(
         """
         <div class="footer-container">
-            <div class="footer-content">
-                <p class="footer-text">
-                    Copyright @2026 Created by <strong>Sandeep</strong> | <span>Ticket Flow Tracker</span>
-                </p>
-            </div>
+            <p class="footer-text">
+                Copyright ©2026 Created by <strong>Sandeep</strong> | <span>Ticket Flow Tracker</span>
+            </p>
         </div>
         """,
         unsafe_allow_html=True
     )
+

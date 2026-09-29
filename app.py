@@ -11,9 +11,29 @@ Run with:  streamlit run app.py
 from __future__ import annotations
 
 import os
+import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+# Suppress harmless Windows asyncio Proactor WinError 10054 when a client tab closes
+if sys.platform == "win32":
+    from functools import wraps
+    try:
+        from asyncio.proactor_events import _ProactorBasePipeTransport
+        _orig_call_connection_lost = _ProactorBasePipeTransport._call_connection_lost
+
+        @wraps(_orig_call_connection_lost)
+        def _silent_call_connection_lost(self, exc):
+            try:
+                _orig_call_connection_lost(self, exc)
+            except (ConnectionResetError, OSError):
+                pass
+
+        _ProactorBasePipeTransport._call_connection_lost = _silent_call_connection_lost
+    except Exception:
+        pass
+
 import pandas as pd
+
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -811,11 +831,11 @@ st.markdown("""
 <div class="landing-header-container">
     <div class="landing-header-left">
         <div class="landing-app-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="6" width="18" height="12" rx="3"></rect>
-                <circle cx="8" cy="12" r="1.2" fill="currentColor"></circle>
-                <circle cx="16" cy="12" r="1.2" fill="currentColor"></circle>
-                <path d="M11 12h2" stroke-width="2" stroke-linecap="round"></path>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="5" width="18" height="6" rx="3"></rect>
+                <line x1="7" y1="8" x2="11" y2="8"></line>
+                <rect x="3" y="13" width="18" height="6" rx="3"></rect>
+                <line x1="7" y1="16" x2="11" y2="16"></line>
             </svg>
         </div>
         <div class="landing-header-titles">
@@ -826,10 +846,13 @@ st.markdown("""
     <div class="system-status-pill">
         <span class="status-pulse-dot"></span>
         <span class="status-text">System Online</span>
-        <span class="status-sparkle">✦</span>
+        <svg class="status-pulse-icon" width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 8h5l2.5-6 4 12 3-8 2.5 4h5" />
+        </svg>
     </div>
 </div>
 """, unsafe_allow_html=True)
+
 
 # Check if using folder data or manual uploads
 use_folder_data = st.session_state.get("folder_data_loaded", False)
@@ -867,153 +890,33 @@ if use_folder_data:
 else:
     # Load from manual uploads
     if not all([master_file, wip_file, dev_file, wait_file, hold_file, open_file, pending_file, closed_file]):
-        # 1. Hero Welcome Card
-        st.markdown("""
-        <div class="landing-hero-card">
-            <div class="hero-card-left">
-                <div class="hero-doc-illustration">
-                    <div class="doc-line doc-line-1"></div>
-                    <div class="doc-line doc-line-2"></div>
-                    <div class="doc-line doc-line-3"></div>
-                    <div class="doc-badge-check">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                    </div>
-                </div>
-                <div class="hero-copy">
-                    <div class="hero-kicker">WELCOME TO</div>
-                    <h2 class="hero-headline">Ticket Flow Tracker <span class="hero-wave">👋</span></h2>
-                    <p class="hero-desc">
-                        Monitor, analyze and manage your complete ticket workflow from a single dashboard. Upload your reports or launch the built-in SQLite database to get started.
-                    </p>
-                </div>
-            </div>
-            <div class="hero-card-right">
-                <div class="hero-cursive-wrap">
-                    <span class="hero-cursive-line1">Better Data</span>
-                    <span class="hero-cursive-line2">Better Decisions</span>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        col_left, col_center, col_right = st.columns([1, 1.6, 1])
 
-        # 2. 4 Metric Overview Cards
-        st.markdown("""
-        <div class="landing-metrics-grid">
-            <div class="landing-metric-card">
-                <div class="lmc-header">
-                    <div class="lmc-icon-badge lmc-icon-blue">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path>
-                            <path d="M13 5v2M13 17v2M13 11v2"></path>
-                        </svg>
-                    </div>
-                    <span class="lmc-title">Total Tickets</span>
-                </div>
-                <div class="lmc-body">
-                    <div class="lmc-value">0</div>
-                    <svg class="lmc-sparkline" width="55" height="24" viewBox="0 0 60 25" fill="none">
-                        <path d="M2 18 Q 15 15, 25 19 T 45 10 T 58 6" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
-                    </svg>
-                </div>
-                <div class="lmc-subtext">— No data loaded</div>
-            </div>
-
-            <div class="landing-metric-card">
-                <div class="lmc-header">
-                    <div class="lmc-icon-badge lmc-icon-amber">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                    </div>
-                    <span class="lmc-title">Open Tickets</span>
-                </div>
-                <div class="lmc-body">
-                    <div class="lmc-value">0</div>
-                    <svg class="lmc-sparkline" width="55" height="24" viewBox="0 0 60 25" fill="none">
-                        <path d="M2 20 Q 18 20, 28 17 T 48 12 T 58 7" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
-                    </svg>
-                </div>
-                <div class="lmc-subtext">— No data loaded</div>
-            </div>
-
-            <div class="landing-metric-card">
-                <div class="lmc-header">
-                    <div class="lmc-icon-badge lmc-icon-purple">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                            <path d="M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
-                            <path d="M16 16h5v5"></path>
-                        </svg>
-                    </div>
-                    <span class="lmc-title">In Progress</span>
-                </div>
-                <div class="lmc-body">
-                    <div class="lmc-value">0</div>
-                    <svg class="lmc-sparkline" width="55" height="24" viewBox="0 0 60 25" fill="none">
-                        <path d="M2 19 Q 18 19, 30 14 T 46 16 T 58 8" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round"/>
-                    </svg>
-                </div>
-                <div class="lmc-subtext">— No data loaded</div>
-            </div>
-
-            <div class="landing-metric-card">
-                <div class="lmc-header">
-                    <div class="lmc-icon-badge lmc-icon-green">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="16 9 10 15 7 12"></polyline>
-                        </svg>
-                    </div>
-                    <span class="lmc-title">Resolved</span>
-                </div>
-                <div class="lmc-body">
-                    <div class="lmc-value">0</div>
-                    <svg class="lmc-sparkline" width="55" height="24" viewBox="0 0 60 25" fill="none">
-                        <path d="M2 21 Q 15 21, 28 16 T 45 13 T 58 6" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"/>
-                    </svg>
-                </div>
-                <div class="lmc-subtext">— No data loaded</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # 3. Two-Column Lower Section: Quick Start + About This Tool
-        c_quick, c_about = st.columns([1.65, 1], gap="medium")
-
-        with c_quick:
-            st.markdown("""
-            <div class="section-heading-row">
-                <span class="section-bolt-icon">⚡</span>
-                <div>
-                    <div class="section-heading-title">Quick Start</div>
-                    <div class="section-heading-subtitle">Choose how you want to load your ticket data.</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            cq1, cq2 = st.columns(2, gap="small")
-            with cq1:
+        with col_center:
+            with st.container(border=True):
                 st.markdown("""
-                <div class="qs-card-container">
-                    <div class="qs-card-content">
-                        <div class="qs-card-icon-badge qs-icon-blue">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-                            </svg>
-                        </div>
-                        <div class="qs-card-title">Load SQLite Database</div>
-                        <div class="qs-card-desc">
-                            Launch instantly using our built-in SQLite database containing all 8 ticket workflow stages and mail directory.
-                        </div>
+                <div class="qs-header-row" style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <span class="qs-bolt-icon" style="font-size: 1.4rem; color: #4f46e5; line-height: 1.1;">⚡</span>
+                    <div>
+                        <div class="qs-header-title" style="font-size: 1.22rem; font-weight: 700; color: #0f172a; line-height: 1.2;">Quick Start</div>
+                        <div class="qs-header-subtitle" style="font-size: 0.85rem; color: #64748b; margin-top: 0.2rem;">Choose how you want to load your ticket data.</div>
+                    </div>
+                </div>
+                <div class="qs-subcard-body" style="display: flex; flex-direction: column; justify-content: flex-start;">
+                    <div class="qs-circle-icon qs-circle-blue" style="width: 44px; height: 44px; border-radius: 50%; background: #2563eb; color: #ffffff; display: flex; align-items: center; justify-content: center; margin-bottom: 0.9rem; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <ellipse cx="12" cy="6" rx="8" ry="3"></ellipse>
+                            <path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"></path>
+                            <path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"></path>
+                        </svg>
+                    </div>
+                    <div class="qs-card-title" style="font-size: 1.08rem; font-weight: 700; color: #0f172a; margin-bottom: 0.45rem;">Load SQLite Database</div>
+                    <div class="qs-card-desc" style="font-size: 0.84rem; color: #64748b; line-height: 1.5; margin-bottom: 1.35rem;">
+                        Launch instantly using our built-in SQLite database containing all 8 ticket workflow stages and mail directory.
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-                
+
                 if st.button("⚡ Load SQLite Database", key="btn_welcome_sqlite", use_container_width=True, type="primary"):
                     data = load_all_from_sqlite()
                     if data:
@@ -1022,86 +925,10 @@ else:
                     else:
                         st.error("Failed to load SQLite data.")
 
-            with cq2:
-                st.markdown("""
-                <div class="qs-card-container">
-                    <div class="qs-card-content">
-                        <div class="qs-card-icon-badge qs-icon-green">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
-                                <path d="M12 12v9"></path>
-                                <path d="m16 16-4-4-4 4"></path>
-                            </svg>
-                        </div>
-                        <div class="qs-card-title">Upload Excel Reports</div>
-                        <div class="qs-card-desc">
-                            Upload your individual ticket export files and analyze the workflow data directly.
-                        </div>
-                    </div>
-                    <div class="qs-dashed-dropzone">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
-                            <path d="M12 12v9"></path>
-                            <path d="m16 16-4-4-4 4"></path>
-                        </svg>
-                        <div class="dropzone-text-primary">Click to upload files</div>
-                        <div class="dropzone-text-secondary">or drag and drop</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        with c_about:
-            st.markdown("""
-            <div class="about-tool-card">
-                <div>
-                    <div class="about-card-header">
-                        <div class="about-info-icon">ℹ</div>
-                        <span class="about-card-title">About This Tool</span>
-                    </div>
-                    <div class="about-checklist">
-                        <div class="about-check-item">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            <span>Visualize complete ticket workflow</span>
-                        </div>
-                        <div class="about-check-item">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            <span>Track all 8 workflow stages</span>
-                        </div>
-                        <div class="about-check-item">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            <span>Analyze data with interactive charts</span>
-                        </div>
-                        <div class="about-check-item">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            <span>Built-in SQLite demo database</span>
-                        </div>
-                        <div class="about-check-item">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            <span>Support for Excel file uploads</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="about-tip-callout">
-                    <span style="font-size: 1.1rem; line-height: 1;">💡</span>
-                    <div>
-                        <strong>Tip:</strong> Use the sidebar to upload your 8 Excel files or start with the demo database.
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
         render_footer()
         st.stop()
+
+
 
     # Load 8 core workflow files
     master_df = load_excel(master_file)
