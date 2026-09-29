@@ -17,6 +17,11 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
+# Ensure .env is explicitly loaded with absolute path before anything else
+ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(dotenv_path=ENV_PATH, override=True)
+load_dotenv(override=True)
+
 from ai import (
     draft_reply,
     generate_data_context,
@@ -44,8 +49,6 @@ from db_service import (
     load_from_demo_folder,
     save_all_to_sqlite,
 )
-
-load_dotenv()
 
 # Auto-initialize SQLite database with demo data if empty
 try:
@@ -800,17 +803,7 @@ with st.sidebar:
     st.caption("Upload mapping file (Ticket Creator → Email ID, e.g. Sanket Tambe → sanket.tambe@unitread.co.in)")
     mail_to_file = st.file_uploader("Mail Directory Mapping", type=["xlsx", "xls", "csv"], key="mail_to", label_visibility="collapsed", help="Excel/CSV mapping Ticket Creators to their Email IDs")
 
-    st.divider()
-    st.markdown('<div class="sidebar-header">🤖 AI Assistant</div>', unsafe_allow_html=True)
-    st.caption("Add an OpenAI API key to enable one-click draft replies for tickets awaiting user info.")
-    key_input = st.text_input("OpenAI API key", type="password", placeholder="sk-...", key="api_key")
-    
-    # Use environment variable if no key is entered in UI
-    if key_input:
-        st.session_state["OPENAI_API_KEY"] = key_input
-        os.environ["OPENAI_API_KEY"] = key_input
-    elif not key_input and os.environ.get("OPENAI_API_KEY"):
-        st.success("✅ API key loaded from .env file")
+
 
 # ---------------------------------------------------------------- Main
 # Header section

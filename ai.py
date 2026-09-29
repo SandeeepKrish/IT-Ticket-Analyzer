@@ -8,7 +8,13 @@ data-aware chatbot that can answer questions about uploaded ticket data.
 import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
+from dotenv import load_dotenv
 import pandas as pd
+
+# Load environment variables from .env file directly
+ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(dotenv_path=ENV_PATH, override=True)
+load_dotenv(override=True)
 
 try:
     from openai import OpenAI
@@ -18,8 +24,17 @@ except ImportError:
     HAS_OPENAI = False
 
 
+def get_api_key() -> Optional[str]:
+    """Retrieve OpenAI API key, falling back to reading .env directly if needed."""
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        load_dotenv(dotenv_path=ENV_PATH, override=True)
+        key = os.environ.get("OPENAI_API_KEY")
+    return key
+
+
 def has_key_configured() -> bool:
-    return bool(os.environ.get("OPENAI_API_KEY"))
+    return bool(get_api_key())
 
 
 def detect_file_type(filename: str) -> Optional[str]:
@@ -176,9 +191,9 @@ def draft_reply(row: pd.Series) -> str:
     if OpenAI is None:
         raise RuntimeError("OpenAI package is not installed. Please install it using `pip install openai`.")
 
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = get_api_key()
     if not api_key:
-        raise RuntimeError("No OpenAI API key configured.")
+        raise RuntimeError("No OpenAI API key configured in .env file.")
 
     client: Any = OpenAI(api_key=api_key)
 
@@ -338,9 +353,9 @@ def get_chatbot_response(
     if OpenAI is None:
         return "The OpenAI package is not installed. Please install `openai` to use the chatbot."
 
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = get_api_key()
     if not api_key:
-        return "No OpenAI API key configured. Please enter your OpenAI API key in the sidebar or `.env` file."
+        return "No OpenAI API key configured in `.env` file. Please verify your OPENAI_API_KEY setting."
 
     client: Any = OpenAI(api_key=api_key)
 
