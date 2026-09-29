@@ -641,84 +641,93 @@ def related_list(df: pd.DataFrame, owner: str, exclude_ticket: str, empty_msg: s
 def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, mail_to_df=None):
     """Render an AI ticket assistant chat box that answers questions about uploaded Excel files."""
     st.divider()
-    st.markdown('<div class="chat-assistant-wrapper">', unsafe_allow_html=True)
     
-    col_h1, col_h2 = st.columns([3, 1])
-    with col_h1:
-        st.markdown("""
-        <div class="chat-header-title">
-            <span>💬 AI Ticket Assistant</span>
-            <span class="chat-header-badge">Smart AI</span>
-        </div>
-        <p style="color: #64748b; font-size: 0.88rem; margin: 0.2rem 0 0.6rem 0;">
-            Ask any question about your uploaded Excel ticket data, owner workloads, priorities, aging, or specific ticket numbers.
-        </p>
-        """, unsafe_allow_html=True)
-    with col_h2:
-        if st.button("🗑️ Clear Chat", key="clear_chat_history", use_container_width=True):
-            st.session_state["chatbot_messages"] = []
+    # Stay collapsed when fresh data is loaded so the user remains on their top dashboard!
+    has_active_conversation = len(st.session_state.get("chatbot_messages", [])) > 1
+    is_expanded = st.session_state.get("chatbot_open", False) or has_active_conversation
+
+    with st.expander("💬 AI Ticket Assistant — Ask Questions About Your Data", expanded=is_expanded):
+        st.markdown('<div class="chat-assistant-wrapper">', unsafe_allow_html=True)
+        
+        col_h1, col_h2 = st.columns([3, 1])
+        with col_h1:
+            st.markdown("""
+            <div class="chat-header-title">
+                <span>💬 AI Ticket Assistant</span>
+                <span class="chat-header-badge">Smart AI</span>
+            </div>
+            <p style="color: #64748b; font-size: 0.88rem; margin: 0.2rem 0 0.6rem 0;">
+                Ask any question about your uploaded Excel ticket data, owner workloads, priorities, aging, or specific ticket numbers.
+            </p>
+            """, unsafe_allow_html=True)
+        with col_h2:
+            if st.button("🗑️ Clear Chat", key="clear_chat_history", use_container_width=True):
+                st.session_state["chatbot_messages"] = []
+                st.session_state["chatbot_open"] = False
+                st.rerun()
+
+        data_ctx = generate_data_context(
+            master_df=master_df,
+            wip_df=wip_df,
+            dev_df=dev_df,
+            wait_df=wait_df,
+            hold_df=hold_df,
+            open_df=open_df,
+            pending_df=pending_df,
+            closed_df=closed_df,
+            mail_to_df=mail_to_df
+        )
+
+        if "chatbot_messages" not in st.session_state:
+            st.session_state["chatbot_messages"] = [
+                {
+                    "role": "assistant",
+                    "content": "👋 Hi! I'm your AI Ticket Assistant. Ask me anything about your uploaded Excel files! For example: *'What is the ticket count breakdown?'*, *'Who has the most open tickets?'*, or search for a specific ticket number."
+                }
+            ]
+
+        # Quick suggestion prompt chips
+        st.markdown("**💡 Quick Questions:**")
+        scol1, scol2, scol3, scol4 = st.columns(4)
+        suggestion_prompt = None
+        with scol1:
+            if st.button("📊 Excel Data Summary", key="chip_summary", use_container_width=True):
+                suggestion_prompt = "Give me a complete summary of all uploaded Excel ticket files, counts, and status."
+        with scol2:
+            if st.button("👥 Top Owner Workloads", key="chip_owners", use_container_width=True):
+                suggestion_prompt = "Who are the top ticket owners and how many tickets does each owner have?"
+        with scol3:
+            if st.button("⏱️ Highest Aging Tickets", key="chip_aging", use_container_width=True):
+                suggestion_prompt = "Which ticket categories or owners have the highest aging days?"
+        with scol4:
+            if st.button("⚠️ Pending & Hold Info", key="chip_pending", use_container_width=True):
+                suggestion_prompt = "How many tickets are in Pending or Hold status and what are their details?"
+
+        # Display chat message history
+        for message in st.session_state["chatbot_messages"]:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+        # Chat Input Box
+        user_input = st.chat_input("Ask any question about your uploaded Excel files...")
+        
+        prompt = suggestion_prompt or user_input
+        
+        if prompt:
+            st.session_state["chatbot_open"] = True
+            st.session_state["chatbot_messages"].append({"role": "user", "content": prompt})
+            
+            with st.spinner("Analyzing Excel data with AI..."):
+                response_text = get_chatbot_response(
+                    user_question=prompt,
+                    data_context=data_ctx,
+                    history=st.session_state["chatbot_messages"]
+                )
+                st.session_state["chatbot_messages"].append({"role": "assistant", "content": response_text})
             st.rerun()
 
-    data_ctx = generate_data_context(
-        master_df=master_df,
-        wip_df=wip_df,
-        dev_df=dev_df,
-        wait_df=wait_df,
-        hold_df=hold_df,
-        open_df=open_df,
-        pending_df=pending_df,
-        closed_df=closed_df,
-        mail_to_df=mail_to_df
-    )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    if "chatbot_messages" not in st.session_state:
-        st.session_state["chatbot_messages"] = [
-            {
-                "role": "assistant",
-                "content": "👋 Hi! I'm your AI Ticket Assistant. Ask me anything about your uploaded Excel files! For example: *'What is the ticket count breakdown?'*, *'Who has the most open tickets?'*, or search for a specific ticket number."
-            }
-        ]
-
-    # Quick suggestion prompt chips
-    st.markdown("**💡 Quick Questions:**")
-    scol1, scol2, scol3, scol4 = st.columns(4)
-    suggestion_prompt = None
-    with scol1:
-        if st.button("📊 Excel Data Summary", key="chip_summary", use_container_width=True):
-            suggestion_prompt = "Give me a complete summary of all uploaded Excel ticket files, counts, and status."
-    with scol2:
-        if st.button("👥 Top Owner Workloads", key="chip_owners", use_container_width=True):
-            suggestion_prompt = "Who are the top ticket owners and how many tickets does each owner have?"
-    with scol3:
-        if st.button("⏱️ Highest Aging Tickets", key="chip_aging", use_container_width=True):
-            suggestion_prompt = "Which ticket categories or owners have the highest aging days?"
-    with scol4:
-        if st.button("⚠️ Pending & Hold Info", key="chip_pending", use_container_width=True):
-            suggestion_prompt = "How many tickets are in Pending or Hold status and what are their details?"
-
-    # Display chat message history
-    for message in st.session_state["chatbot_messages"]:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Chat Input Box at the bottom
-    user_input = st.chat_input("Ask any question about your uploaded Excel files...")
-    
-    prompt = suggestion_prompt or user_input
-    
-    if prompt:
-        st.session_state["chatbot_messages"].append({"role": "user", "content": prompt})
-        
-        with st.spinner("Analyzing Excel data with AI..."):
-            response_text = get_chatbot_response(
-                user_question=prompt,
-                data_context=data_ctx,
-                history=st.session_state["chatbot_messages"]
-            )
-            st.session_state["chatbot_messages"].append({"role": "assistant", "content": response_text})
-        st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------- Sidebar
@@ -1038,14 +1047,6 @@ st.html(f"""
         }}
     }};
 
-    window.addEventListener('wheel', releaseScroll, {{ passive: true }});
-    window.addEventListener('touchmove', releaseScroll, {{ passive: true }});
-    window.addEventListener('keydown', (e) => {{
-        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Space', 'Home', 'End'].includes(e.code)) {{
-            releaseScroll();
-        }}
-    }}, {{ passive: true }});
-
     // Intercept programmatic scrollIntoView so lower elements don't yank the viewport down
     if (!window._origScrollIntoView) {{
         window._origScrollIntoView = Element.prototype.scrollIntoView;
@@ -1055,24 +1056,66 @@ st.html(f"""
         }};
     }}
 
+    // Intercept native focus so chat inputs or other lower elements cannot autofocus-scroll on load
+    if (!window._origFocus) {{
+        window._origFocus = HTMLElement.prototype.focus;
+        HTMLElement.prototype.focus = function(options) {{
+            if (this.tagName === 'TEXTAREA' && this.closest && this.closest('[data-testid="stChatInput"]')) {{
+                if (!window._userEngagedWithChat) {{
+                    return;
+                }}
+            }}
+            return window._origFocus.apply(this, arguments);
+        }};
+    }}
+
+    document.addEventListener('click', function(e) {{
+        if (e.target && e.target.closest && e.target.closest('[data-testid="stChatInput"]')) {{
+            window._userEngagedWithChat = true;
+        }}
+    }}, true);
+
     function lockTop() {{
         if (userHasScrolled) return;
-        const main = document.querySelector('section.main') || document.querySelector('.stAppViewContainer');
-        if (main && main.scrollTop > 0) main.scrollTop = 0;
-        if (document.documentElement && document.documentElement.scrollTop > 0) document.documentElement.scrollTop = 0;
-        if (document.body && document.body.scrollTop > 0) document.body.scrollTop = 0;
+        const targets = [
+            document.querySelector('section.main'),
+            document.querySelector('.stAppViewContainer'),
+            document.querySelector('[data-testid="stAppViewContainer"]'),
+            document.querySelector('[data-testid="stMain"]'),
+            document.documentElement,
+            document.body
+        ];
+        targets.forEach(t => {{
+            if (t && t.scrollTop > 0) t.scrollTop = 0;
+        }});
         if (window.scrollY > 0) window.scrollTo(0, 0);
     }}
 
-    // Keep viewport anchored to top continuously for 3.5 seconds across page hydration
+    // Keep viewport anchored to top continuously across full page load
+    lockTop();
     if (window._lockTopInterval) clearInterval(window._lockTopInterval);
-    window._lockTopInterval = setInterval(lockTop, 25);
+    window._lockTopInterval = setInterval(lockTop, 30);
     setTimeout(() => {{
         if (window._lockTopInterval) {{
             clearInterval(window._lockTopInterval);
             window._lockTopInterval = null;
         }}
-    }}, 3500);
+        lockTop();
+    }}, 4500);
+
+    // Only allow manual scroll after initial settle
+    setTimeout(() => {{
+        window.addEventListener('wheel', (e) => {{
+            if (Math.abs(e.deltaY) > 8) releaseScroll();
+        }}, {{ passive: true }});
+        window.addEventListener('touchmove', releaseScroll, {{ passive: true }});
+        window.addEventListener('keydown', (e) => {{
+            if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Space', 'Home', 'End'].includes(e.code)) {{
+                releaseScroll();
+            }}
+        }}, {{ passive: true }});
+    }}, 1000);
+
 
     function animateCounters() {{
         const counters = document.querySelectorAll('.counter-value[data-target]');
