@@ -774,3 +774,89 @@ header    { visibility: hidden; }
     color: #ffffff !important;
 }
 
+/* =====================================================
+   SQLite Database & Demo Data Mode Styles
+   ===================================================== */
+.demo-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+    border: 1px solid #bbf7d0;
+    border-left: 4px solid #10b981;
+    border-radius: 8px;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.demo-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.92rem;
+    color: #065f46;
+}
+
+.demo-badge-sqlite {
+    background: #059669;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.demo-badge-folder {
+    background: #0284c7;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.db-status-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+}
+
+.db-status-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.35rem;
+}
+
+.welcome-quickstart-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+    border: 2px dashed #93c5fd;
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    margin: 1.5rem 0;
+}
+
+.welcome-quickstart-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1e3a8a;
+    margin-bottom: 0.4rem;
+}
+
+.welcome-quickstart-sub {
+    font-size: 0.9rem;
+    color: #475569;
+    margin-bottom: 1.2rem;
+}
+

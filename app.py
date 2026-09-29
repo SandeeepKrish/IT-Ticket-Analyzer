@@ -34,8 +34,51 @@ from mail_service import (
     generate_reminder_email,
     send_smtp_email,
 )
+from db_service import (
+    DB_PATH,
+    DEMO_FOLDER_PATH,
+    export_database_to_excel_folder,
+    get_sqlite_stats,
+    init_database,
+    load_all_from_sqlite,
+    load_from_demo_folder,
+    save_all_to_sqlite,
+)
 
 load_dotenv()
+
+# Auto-initialize SQLite database with demo data if empty
+try:
+    init_database()
+except Exception:
+    pass
+
+
+def load_dataset_into_session(data_dict: Dict[str, Any], source_label: str = "SQLite Database") -> None:
+    """Store loaded dataset (all 8 stages + mail_to) into session state."""
+    st.session_state["folder_data_loaded"] = True
+    st.session_state["data_source_mode"] = source_label
+    st.session_state["master_df"] = data_dict.get("master")
+    st.session_state["wip_df"] = data_dict.get("wip")
+    st.session_state["dev_df"] = data_dict.get("dev")
+    st.session_state["wait_df"] = data_dict.get("wait")
+    st.session_state["hold_df"] = data_dict.get("hold")
+    st.session_state["open_df"] = data_dict.get("open")
+    st.session_state["pending_df"] = data_dict.get("pending")
+    st.session_state["closed_df"] = data_dict.get("closed")
+    st.session_state["mail_to_df"] = data_dict.get("mail_to", None)
+
+
+def clear_loaded_session_data() -> None:
+    """Clear all loaded dataset keys from session state."""
+    keys_to_clear = [
+        "folder_data_loaded", "data_source_mode", "master_df", "wip_df",
+        "dev_df", "wait_df", "hold_df", "open_df", "pending_df", "closed_df", "mail_to_df"
+    ]
+    for k in keys_to_clear:
+        if k in st.session_state:
+            del st.session_state[k]
+
 
 st.set_page_config(
     page_title="Ticket Flow Tracker", 
@@ -657,6 +700,26 @@ def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_d
 
 # ---------------------------------------------------------------- Sidebar
 with st.sidebar:
+    # ============ SQLITE DATABASE ============
+    st.markdown('<div class="sidebar-header">🗄️ SQLite Database</div>', unsafe_allow_html=True)
+    st.caption("Run the project directly using data stored in SQLite database (no file upload required):")
+    
+    if st.button("⚡ Load SQLite Database", key="btn_load_sqlite_demo", use_container_width=True, type="primary"):
+        data = load_all_from_sqlite()
+        if data:
+            load_dataset_into_session(data, source_label="SQLite Database")
+            st.toast("✅ SQLite Database loaded successfully!", icon="🚀")
+            st.rerun()
+        else:
+            st.error("Could not load data from SQLite database.")
+
+    if st.session_state.get("folder_data_loaded", False):
+        if st.button("❌ Clear Loaded Data", key="btn_clear_loaded", use_container_width=True):
+            clear_loaded_session_data()
+            st.rerun()
+
+    st.divider()
+
     st.markdown('<div class="sidebar-header">📂 Upload Ticket Reports</div>', unsafe_allow_html=True)
     
     # ============ FAST FOLDER UPLOAD (NEW!) ============
@@ -796,10 +859,29 @@ else:
     if not all([master_file, wip_file, dev_file, wait_file, hold_file, open_file, pending_file, closed_file]):
         st.markdown("""
         <div class="welcome-section">
-            <div class="welcome-title">🚀 Upload Required Files</div>
-            <div class="welcome-text">Please upload all 8 ticket export files in the sidebar to begin comprehensive ticket analysis.</div>
+            <div class="welcome-title">🚀 Welcome to Ticket Flow Tracker</div>
+            <div class="welcome-text">Please upload all 8 ticket export files in the sidebar, or launch instantly using our built-in SQLite demo database!</div>
         </div>
         """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="welcome-quickstart-card">
+            <div class="welcome-quickstart-title">⚡ Instant Project Showcase (No Files Needed!)</div>
+            <div class="welcome-quickstart-sub">
+                Don't have your Excel files with you right now? Launch directly with data stored in the <strong>SQLite Database</strong> (all 8 ticket workflow stages & mail directory included) with a single click.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("⚡ Load SQLite Database", key="btn_welcome_sqlite", use_container_width=True, type="primary"):
+            data = load_all_from_sqlite()
+            if data:
+                load_dataset_into_session(data, source_label="SQLite Database")
+                st.rerun()
+            else:
+                st.error("Failed to load SQLite data.")
+
+        st.caption("💡 Or select your individual Excel report files in the sidebar on the left.")
         render_footer()
         st.stop()
 
@@ -813,6 +895,17 @@ else:
     pending_df = load_excel(pending_file)
     closed_df = load_excel(closed_file)
     mail_to_df = load_excel(mail_to_file) if mail_to_file is not None else st.session_state.get("mail_to_df", None)
+
+    # Store in session state so SQLite database tools can save it
+    st.session_state["master_df"] = master_df
+    st.session_state["wip_df"] = wip_df
+    st.session_state["dev_df"] = dev_df
+    st.session_state["wait_df"] = wait_df
+    st.session_state["hold_df"] = hold_df
+    st.session_state["open_df"] = open_df
+    st.session_state["pending_df"] = pending_df
+    st.session_state["closed_df"] = closed_df
+    st.session_state["mail_to_df"] = mail_to_df
 
 # Validate the 8 core ticket workflow files have required columns
 files_to_validate = [
@@ -829,6 +922,26 @@ files_to_validate = [
 for df, label in files_to_validate:
     if not validate_columns(df, label):
         st.stop()
+
+# Demo mode top banner if loaded from SQLite or demo folder
+source_mode = st.session_state.get("data_source_mode")
+if source_mode:
+    badge_cls = "demo-badge-sqlite" if "SQLite" in source_mode else "demo-badge-folder"
+    col_banner, col_banner_btn = st.columns([5, 1])
+    with col_banner:
+        contacts_count = len(mail_to_df) if mail_to_df is not None else 0
+        st.markdown(f"""
+        <div class="demo-banner">
+            <div class="demo-banner-content">
+                <span class="{badge_cls}">{source_mode}</span>
+                <span>Active Demo Dataset: <strong>{len(master_df)} tickets</strong> across 8 workflow stages • <strong>{contacts_count} mail contacts</strong>. Ready for presentation & testing!</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_banner_btn:
+        if st.button("🔄 Clear Data", key="btn_banner_clear", use_container_width=True, help="Clear loaded demo data and return to upload screen"):
+            clear_loaded_session_data()
+            st.rerun()
 
 # Enhanced metrics display for all 8 categories with fast count-up animation
 st.html(f"""

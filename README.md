@@ -14,22 +14,28 @@ This platform streamlines support operations across 8 workflow stages, eliminate
 - **Cross-Queue Search**: Search any ticket number or creator to instantly view its live status and uncover every other open ticket associated with that owner.
 - **Workflow Process Visualizer**: Interactive diagram outlining ticket progression from creation to resolution.
 
-### 2. 📁 Smart Batch / Folder Upload with Auto-Detection
+### 2. 🗄️ Instant SQLite Demo Mode & Local Showcase
+- **Zero-File Quickstart**: Run and present the dashboard anywhere with a single click—no Excel files required.
+- **Embedded SQLite Storage**: Built-in `data/tickets.db` automatically seeds and stores complete 8-stage ticket workflows and mail directories.
+- **Save Uploads to Database**: Save your own uploaded Excel reports into SQLite as persistent datasets.
+- **Demo Files Folder**: Includes ready-to-use sample spreadsheets in `demo_files/` for demonstrating batch folder uploads.
+
+### 3. 📁 Smart Batch / Folder Upload with Auto-Detection
 - **Single-Click Ingestion**: Upload all Excel files (`.xlsx`) at once in a single folder upload.
 - **Fuzzy Auto-Detection**: Automatically identifies and categorizes files using filename matching (e.g. `master`, `wip`, `dev`, `awaiting`, `hold`, `open`, `pending`, `closed`, and `mail_to`).
 - **Validation & Summaries**: Live status indicators confirming all workflow files and directories are detected and validated before processing.
 
-### 3. ✉️ Automated Mail Services & Follow-Up Reminders
+### 4. ✉️ Automated Mail Services & Follow-Up Reminders
 - **Mail Directory Integration (`mail_to.xlsx`)**: Dynamically resolves creator names to corporate email addresses using exact, lowercase, and partial token matching.
 - **1-Click "Send via Outlook"**: Encoded `mailto:` URL links pre-filled with ticket number, subject, aging, and response guidance.
 - **Bulk Background SMTP Dispatch**: Send hundreds of personalized follow-up emails directly through your corporate mail server (Office 365, Gmail, custom SMTP) with live progress tracking.
 - **Queue Follow-up Cards**: Visual cards displaying creator email tags, aging counters, and expandable draft previews.
 
-### 4. 🤖 AI-Powered Assistant & Chatbot
+### 5. 🤖 AI-Powered Assistant & Chatbot
 - **Data-Aware Chatbot**: Query your uploaded tickets using natural language. The chatbot understands ticket counts, departments, bottlenecks, and aging data.
 - **Smart Reply Drafting**: Generates context-aware follow-up messages tailored to ticket descriptions using OpenAI GPT models.
 
-### 5. 📊 Advanced Analytics & Date Filtering
+### 6. 📊 Advanced Analytics & Date Filtering
 - **Dynamic Slicers**: Filter by Owner, Year, and Month dynamically across all tabs.
 - **Workload & Bottleneck Metrics**: Visual KPI counters, aging analyses, and workload distribution breakdowns.
 
@@ -43,11 +49,14 @@ The codebase is built on a clean, modular architecture:
 ticket-flow-tracker-py/
 │
 ├── app.py              # Main dashboard application, page routing, and Streamlit UI
+├── db_service.py       # 🗄️ SQLite database persistence, demo data seeding & export utilities
 ├── mail_service.py     # ✉️ Mail directory parsing, email matching, mailto generation & SMTP dispatch
 ├── ai.py               # 🤖 OpenAI integration, AI reply drafting, chatbot & folder auto-detection
 ├── footer.py           # 🏷️ Branded enterprise footer component
 ├── style.css           # 🎨 Custom styling, glassmorphism, responsive cards & status badges
 │
+├── data/               # 💾 Local SQLite database directory (tickets.db)
+├── demo_files/         # 📁 Ready-to-use sample Excel spreadsheets for demonstration
 ├── requirements.txt    # Python dependencies
 ├── .env.example        # Environment variable configuration template
 ├── .gitignore          # Version control ignore rules
@@ -56,6 +65,7 @@ ticket-flow-tracker-py/
 
 ### Module Responsibilities:
 - **[app.py](file:///y:/Common/SandeepERPandIT/SANDDEP%20TECH/ticket-flow-tracker-py/app.py)**: Coordinates UI layout, sidebar uploads, filtering engines, and tab navigation.
+- **[db_service.py](file:///y:/Common/SandeepERPandIT/SANDDEP%20TECH/ticket-flow-tracker-py/db_service.py)**: Manages SQLite database initialization, demo seeding, dataset persistence, and Excel exports.
 - **[mail_service.py](file:///y:/Common/SandeepERPandIT/SANDDEP%20TECH/ticket-flow-tracker-py/mail_service.py)**: Encapsulates all email logic (`build_email_directory`, `find_creator_email`, `generate_reminder_email`, `generate_mailto_url`, `send_smtp_email`).
 - **[ai.py](file:///y:/Common/SandeepERPandIT/SANDDEP%20TECH/ticket-flow-tracker-py/ai.py)**: Manages OpenAI client connections, prompt engineering, dataset context serialization, and filename fuzzy detection.
 - **[style.css](file:///y:/Common/SandeepERPandIT/SANDDEP%20TECH/ticket-flow-tracker-py/style.css)**: Lightweight CSS overriding Streamlit defaults with custom gradients, badges, and card components.
