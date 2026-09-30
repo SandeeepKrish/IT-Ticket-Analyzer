@@ -59,20 +59,46 @@ from mail_service import (
     generate_reminder_email,
     send_smtp_email,
 )
-from db_service import (
-    DB_PATH,
-    DEMO_FOLDER_PATH,
-    export_database_to_excel_folder,
-    get_sent_reminders_dataframe,
-    get_sent_reminders_map,
-    get_sqlite_stats,
-    init_database,
-    load_all_from_sqlite,
-    load_from_demo_folder,
-    record_sent_reminder,
-    remove_sent_reminder,
-    save_all_to_sqlite,
-)
+try:
+    from db_service import (
+        DB_PATH,
+        DEMO_FOLDER_PATH,
+        export_database_to_excel_folder,
+        get_sent_reminders_dataframe,
+        get_sent_reminders_map,
+        get_sqlite_stats,
+        init_database,
+        load_all_from_sqlite,
+        load_from_demo_folder,
+        record_sent_reminder,
+        remove_sent_reminder,
+        save_all_to_sqlite,
+    )
+except ImportError:
+    from db_service import (  # type: ignore
+        DB_PATH,
+        DEMO_FOLDER_PATH,
+        export_database_to_excel_folder,
+        get_sent_reminders_dataframe,
+        get_sent_reminders_map,
+        get_sqlite_stats,
+        init_database,
+        load_all_from_sqlite,
+        load_from_demo_folder,
+        record_sent_reminder,
+        save_all_to_sqlite,
+    )
+    def remove_sent_reminder(ticket_number: str) -> bool:  # type: ignore
+        import sqlite3
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            with conn:
+                conn.execute("DELETE FROM sent_reminders WHERE ticket_number = ?", (str(ticket_number).strip(),))
+            conn.close()
+            return True
+        except Exception:
+            return False
+
 
 # Auto-initialize SQLite database with demo data if empty
 try:
