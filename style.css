@@ -989,6 +989,14 @@ header {
     color: #ffffff !important;
 }
 
+.reminder-action-btn-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+
 
 /* =====================================================
    SQLite Database & Demo Data Mode Styles

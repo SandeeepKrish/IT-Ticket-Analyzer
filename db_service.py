@@ -139,6 +139,21 @@ def get_sent_reminders_dataframe(db_path: str = DB_PATH) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def remove_sent_reminder(ticket_number: str, db_path: str = DB_PATH) -> bool:
+    """Remove a reminder record from SQLite (marks ticket as Not Sent)."""
+    if not ticket_number:
+        return False
+    try:
+        conn = get_connection(db_path)
+        with conn:
+            conn.execute("DELETE FROM sent_reminders WHERE ticket_number = ?", (str(ticket_number).strip(),))
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+
 def generate_seed_data() -> Dict[str, pd.DataFrame]:
     """
     Generate realistic IT/ERP enterprise ticket datasets for demonstration.

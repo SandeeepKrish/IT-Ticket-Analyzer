@@ -70,6 +70,7 @@ from db_service import (
     load_all_from_sqlite,
     load_from_demo_folder,
     record_sent_reminder,
+    remove_sent_reminder,
     save_all_to_sqlite,
 )
 
@@ -1659,7 +1660,7 @@ with tab3:
             )
             email_badge = f'<span class="reminder-email-tag">✉️ {matched_addr}</span>' if matched_addr else '<span class="reminder-email-missing">⚠️ Email not found in directory</span>'
             
-            c_left, c_right = st.columns([3.8, 1.4])
+            c_left, c_right = st.columns([3.6, 1.6])
             with c_left:
                 st.markdown(f"""
                 <div class="{card_class}">
@@ -1674,26 +1675,36 @@ with tab3:
                 """, unsafe_allow_html=True)
             with c_right:
                 if mailto_link:
-                    btn_text = "✉️ Re-send via Outlook" if is_sent else "✉️ Send via Outlook"
-                    btn_type = "secondary" if is_sent else "primary"
+                    # 1. Direct browser mailto link - guaranteed to launch Outlook immediately on click
+                    outlook_btn_cls = "reminder-outlook-link-resend" if is_sent else "reminder-outlook-link"
+                    outlook_btn_txt = "✉️ Re-open in Outlook" if is_sent else "✉️ Open in Outlook"
                     
-                    if st.button(btn_text, key=f"btn_send_out_{t_num}", type=btn_type, use_container_width=True):
-                        # 1. Log to SQLite
-                        record_sent_reminder(
-                            ticket_number=t_num,
-                            creator_name=creator,
-                            recipient_email=matched_addr or "",
-                            subject=item["email_subject"],
-                            sent_by=cfg_sender_email,
-                            delivery_mode="Outlook"
-                        )
-                        # 2. Trigger mailto in client's browser
-                        st.markdown(f"""
-                        <meta http-equiv="refresh" content="0; url='{mailto_link}'" />
-                        <script>window.location.href = "{mailto_link}";</script>
-                        """, unsafe_allow_html=True)
-                        st.toast(f"✅ Logged reminder for {t_num} & opening Outlook...", icon="✉️")
-                        st.rerun()
+                    st.markdown(f"""
+                    <div style="margin-top: 0.2rem; margin-bottom: 0.4rem;">
+                        <a href="{mailto_link}" class="{outlook_btn_cls}" style="width: 100%; justify-content: center; box-sizing: border-box;">
+                            {outlook_btn_txt}
+                        </a>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # 2. Manual status toggle button: saves to SQLite and turns card Red (or toggles back)
+                    if not is_sent:
+                        if st.button("✅ Mark as Sent", key=f"btn_mark_sent_{t_num}", type="primary", use_container_width=True, help="Click once you send the email in Outlook to turn this card red and log to SQLite"):
+                            record_sent_reminder(
+                                ticket_number=t_num,
+                                creator_name=creator,
+                                recipient_email=matched_addr or "",
+                                subject=item["email_subject"],
+                                sent_by=cfg_sender_email,
+                                delivery_mode="Outlook"
+                            )
+                            st.toast(f"✅ Marked Ticket #{t_num} as Sent in SQLite!", icon="🔴")
+                            st.rerun()
+                    else:
+                        if st.button("↩️ Undo Sent", key=f"btn_undo_sent_{t_num}", type="secondary", use_container_width=True, help="Reset status back to light blue (Not Sent)"):
+                            remove_sent_reminder(t_num)
+                            st.toast(f"Reset Ticket #{t_num} to Not Sent.", icon="🔵")
+                            st.rerun()
                 else:
                     st.caption("No email mapped")
 
