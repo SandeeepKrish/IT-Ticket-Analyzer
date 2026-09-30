@@ -150,17 +150,19 @@ def _load_css(css_path: str) -> None:
 _load_css(os.path.join(os.path.dirname(__file__), "style.css"))
 
 
-def display_filter_results(df: pd.DataFrame, category_name: str, owner_filter: Any, year_filter: Any, month_filter: Any, category_color: str):
+def display_filter_results(df: pd.DataFrame, category_name: str, owner_filter: Any, year_filter: Any, month_filter: Any, category_color: str, creator_filter: Any = "All creators"):
     """Display prominent filter results with ticket counts and breakdowns"""
     
     # Get filtered data
-    filtered_df = get_filtered_data(df, owner_filter, year_filter, month_filter)
+    filtered_df = get_filtered_data(df, owner_filter, year_filter, month_filter, creator_filter)
     total_tickets = len(filtered_df)
     
     # Build filter description
     filter_parts = []
     if owner_filter != "All owners":
         filter_parts.append(f"Owner: {owner_filter}")
+    if creator_filter != "All creators":
+        filter_parts.append(f"Creator: {creator_filter}")
     if year_filter != "All Years":
         filter_parts.append(f"Year: {year_filter}")
     if month_filter != "All Months":
@@ -539,19 +541,24 @@ def display_workflow_diagram():
     """, unsafe_allow_html=True)
 
 
-def get_filtered_data(df: pd.DataFrame, owner_filter: Any, year_filter=None, month_filter=None) -> pd.DataFrame:
-    """Filter dataframe by owner, year, and month"""
+def get_filtered_data(df: pd.DataFrame, owner_filter: Any, year_filter=None, month_filter=None, creator_filter: Any = "All creators") -> pd.DataFrame:
+    """Filter dataframe by owner, creator, year, and month"""
     filtered_df = df.copy()
     
     # Filter by owner
-    if owner_filter != "All owners":
+    if owner_filter != "All owners" and "Ticket Owner" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["Ticket Owner"] == owner_filter]
+    
+    # Filter by creator
+    if creator_filter != "All creators" and "Ticket Creator" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["Ticket Creator"] == creator_filter]
     
     # Filter by date if filters are provided
     if year_filter is not None and month_filter is not None:
         filtered_df = filter_by_date(filtered_df, year_filter, month_filter)
     
     return filtered_df
+
 
 
 REQUIRED_COLS = [
@@ -1411,27 +1418,32 @@ tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 
 with tab0:
     # Filters for Master List
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(master_df["Ticket Owner"].dropna().unique().tolist())
         master_owner_filter = st.selectbox("Master Owner", owners, key="master_owner_filter", label_visibility="collapsed")
     with col2:
+        st.markdown('<div class="filter-label">Filter by Creator</div>', unsafe_allow_html=True)
+        creators = ["All creators"] + (sorted(master_df["Ticket Creator"].dropna().unique().tolist()) if "Ticket Creator" in master_df.columns else [])
+        master_creator_filter = st.selectbox("Master Creator", creators, key="master_creator_filter", label_visibility="collapsed")
+    with col3:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
         master_year_filter = st.selectbox("Master Year", available_years, key="master_year_filter", label_visibility="collapsed")
-    with col3:
+    with col4:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
         master_month_filter = st.selectbox("Master Month", available_months, key="master_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
-    display_filter_results(master_df, "Master List", master_owner_filter, master_year_filter, master_month_filter, "#17a2b8")
+    display_filter_results(master_df, "Master List", master_owner_filter, master_year_filter, master_month_filter, "#17a2b8", creator_filter=master_creator_filter)
     
     # Display user statistics if specific owner is selected
     display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, master_owner_filter, master_year_filter, master_month_filter)
     
     # Filter and display data
-    master_view = get_filtered_data(master_df, master_owner_filter, master_year_filter, master_month_filter)
+    master_view = get_filtered_data(master_df, master_owner_filter, master_year_filter, master_month_filter, creator_filter=master_creator_filter)
     st.dataframe(master_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
+
 
 with tab1:
     # Filters for Work in Progress
