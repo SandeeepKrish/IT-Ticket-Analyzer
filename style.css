@@ -996,6 +996,66 @@ header {
     margin-top: 0.35rem;
 }
 
+/* Conversation Thread Styles */
+.conversation-box {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.conversation-bubble {
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.75rem;
+    position: relative;
+}
+
+.conversation-bubble-user {
+    background: #f8fafc;
+    border-left: 4px solid #0284c7;
+    margin-right: 1.5rem;
+}
+
+.conversation-bubble-support {
+    background: #f0fdf4;
+    border-left: 4px solid #16a34a;
+    margin-left: 1.5rem;
+}
+
+.conversation-sender {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+
+.conversation-sender-user {
+    color: #0369a1;
+}
+
+.conversation-sender-support {
+    color: #15803d;
+}
+
+.conversation-time {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #64748b;
+}
+
+.conversation-text {
+    font-size: 0.88rem;
+    color: #334155;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+
 
 
 /* =====================================================

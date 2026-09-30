@@ -1495,25 +1495,30 @@ with tab2:
 
 with tab3:
     # Filters for Awaiting User Info
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(wait_df["Ticket Owner"].dropna().unique().tolist())
         wait_owner_filter = st.selectbox("Wait Owner", owners, key="wait_owner_filter", label_visibility="collapsed")
     with col2:
+        st.markdown('<div class="filter-label">Filter by Creator</div>', unsafe_allow_html=True)
+        wait_creators = ["All creators"] + (sorted(wait_df["Ticket Creator"].dropna().unique().tolist()) if "Ticket Creator" in wait_df.columns else [])
+        wait_creator_filter = st.selectbox("Wait Creator", wait_creators, key="wait_creator_filter", label_visibility="collapsed")
+    with col3:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
         wait_year_filter = st.selectbox("Wait Year", available_years, key="wait_year_filter", label_visibility="collapsed")
-    with col3:
+    with col4:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
         wait_month_filter = st.selectbox("Wait Month", available_months, key="wait_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
-    display_filter_results(wait_df, "Awaiting User Info", wait_owner_filter, wait_year_filter, wait_month_filter, "#dc3545")
+    display_filter_results(wait_df, "Awaiting User Info", wait_owner_filter, wait_year_filter, wait_month_filter, "#dc3545", creator_filter=wait_creator_filter)
     
     # Display user statistics if specific owner is selected
     display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, wait_owner_filter, wait_year_filter, wait_month_filter)
     
-    wait_view = get_filtered_data(wait_df, wait_owner_filter, wait_year_filter, wait_month_filter)
+    wait_view = get_filtered_data(wait_df, wait_owner_filter, wait_year_filter, wait_month_filter, creator_filter=wait_creator_filter)
+
 
     # =========================================================================
     # 📢 TICKET CREATOR REMINDER DISPATCHER
@@ -1746,9 +1751,45 @@ with tab3:
                 else:
                     st.caption("No email mapped")
 
-            with st.expander(f"📄 Preview Message for {t_num} ({creator})", expanded=False):
+            raw_ticket = item.get("raw_row")
+            ticket_desc = str(raw_ticket.get("Description", "")).strip() if raw_ticket is not None else ""
+            customer_name = str(raw_ticket.get("Customer Name", "—")).strip() if raw_ticket is not None else "—"
+            start_date_val = str(raw_ticket.get("Start Date", "—")).strip() if raw_ticket is not None else "—"
+            priority_val = str(raw_ticket.get("Ticket Priority", "Normal")).strip() if raw_ticket is not None else "Normal"
+
+            with st.expander(f"💬 View Conversation & Description for {t_num} ({creator})", expanded=False):
+                # Section 1: Ticket Overview and Description / Conversation Thread
+                st.markdown(f"##### 🎫 Ticket #{t_num}: {t_subj}")
+                st.caption(f"🏢 **Customer**: {customer_name} | 👤 **Creator**: {creator} ({matched_addr or 'No email'}) | ⚡ **Priority**: {priority_val} | 📅 **Opened**: {start_date_val} | ⏱️ **Aging**: {aging} days")
+                
+                st.markdown("###### 📝 Ticket Description & Conversation History")
+                if ticket_desc and ticket_desc not in ("nan", "None", ""):
+                    st.markdown(f"""
+                    <div class="conversation-box">
+                        <div class="conversation-bubble conversation-bubble-user">
+                            <div class="conversation-sender conversation-sender-user">
+                                <span>👤 Initial Request by {creator}</span>
+                                <span class="conversation-time">📅 {start_date_val}</span>
+                            </div>
+                            <div class="conversation-text">{ticket_desc}</div>
+                        </div>
+                        <div class="conversation-bubble conversation-bubble-support">
+                            <div class="conversation-sender conversation-sender-support">
+                                <span>🛠️ Support Response (Awaiting User Info)</span>
+                                <span class="conversation-time">⏱️ Pending {aging} days</span>
+                            </div>
+                            <div class="conversation-text">Ticket has been investigated and marked 'Awaiting User Info'. Follow-up reminder has been drafted to resolve pending blockers with the creator.</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.info("No recorded conversation or description text attached to this ticket in the uploaded Excel file.")
+
+                # Section 2: Outgoing Follow-Up Email Message
+                st.markdown("###### ✉️ Outgoing Follow-Up Reminder Draft")
                 st.text_area("Subject", item["email_subject"], key=f"subj_{t_num}", height=68, disabled=True)
                 st.text_area("Body", item["email_body"], key=f"body_{t_num}", height=180, disabled=True)
+
 
     st.divider()
     st.markdown("#### 📋 Awaiting User Info Tickets Table")
