@@ -1572,6 +1572,7 @@ with tab3:
         reminder_list.append({
             "ticket_no": r.get("Ticket Number", ""),
             "creator": creator_val,
+            "owner": str(r.get("Ticket Owner", "Unassigned")).strip(),
             "matched_email": matched_email,
             "subject": r.get("Subject", ""),
             "aging": r.get("Ticket Aging", 0),
@@ -1753,42 +1754,69 @@ with tab3:
 
             raw_ticket = item.get("raw_row")
             ticket_desc = str(raw_ticket.get("Description", "")).strip() if raw_ticket is not None else ""
+            ticket_owner = str(item.get("owner") or (raw_ticket.get("Ticket Owner", "Unassigned") if raw_ticket is not None else "Unassigned")).strip()
             customer_name = str(raw_ticket.get("Customer Name", "—")).strip() if raw_ticket is not None else "—"
             start_date_val = str(raw_ticket.get("Start Date", "—")).strip() if raw_ticket is not None else "—"
+            req_date_val = str(raw_ticket.get("Required Date", "—")).strip() if raw_ticket is not None else "—"
+            est_date_val = str(raw_ticket.get("Estimate Resolution Date", "—")).strip() if raw_ticket is not None else "—"
             priority_val = str(raw_ticket.get("Ticket Priority", "Normal")).strip() if raw_ticket is not None else "Normal"
+            dept_val = str(raw_ticket.get("Ticket Department", "Support")).strip() if raw_ticket is not None else "Support"
 
             with st.expander(f"💬 View Conversation & Description for {t_num} ({creator})", expanded=False):
-                # Section 1: Ticket Overview and Description / Conversation Thread
+                # Section 1: Ticket Overview & Owner Metadata
                 st.markdown(f"##### 🎫 Ticket #{t_num}: {t_subj}")
-                st.caption(f"🏢 **Customer**: {customer_name} | 👤 **Creator**: {creator} ({matched_addr or 'No email'}) | ⚡ **Priority**: {priority_val} | 📅 **Opened**: {start_date_val} | ⏱️ **Aging**: {aging} days")
                 
-                st.markdown("###### 📝 Ticket Description & Conversation History")
+                # Dedicated Owner & Assigned Analyst Callout
+                st.markdown(f"""
+                <div style="background: #f1f5f9; border-left: 4px solid #3b82f6; border-radius: 6px; padding: 0.6rem 0.9rem; margin: 0.4rem 0 0.8rem 0;">
+                    <div style="font-size: 0.88rem; color: #0f172a;">
+                        👨‍💻 <strong>Ticket Owner / Respondent:</strong> <span style="color: #1d4ed8; font-weight: 700;">{ticket_owner}</span> ({dept_val})
+                        &nbsp;&nbsp;•&nbsp;&nbsp;
+                        👤 <strong>Created By:</strong> <span style="color: #0369a1; font-weight: 600;">{creator}</span> ({matched_addr or 'No email'})
+                    </div>
+                    <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">
+                        🏢 Customer: <strong>{customer_name}</strong> &nbsp;|&nbsp; ⚡ Priority: <strong>{priority_val}</strong> &nbsp;|&nbsp; 📅 Opened: <strong>{start_date_val}</strong> &nbsp;|&nbsp; 🎯 Est. Resolution: <strong>{est_date_val}</strong> &nbsp;|&nbsp; ⏱️ Aging: <strong>{aging} days</strong>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Section 2: Ticket Description & Conversation History with Last Reply highlight
+                st.markdown("###### 📝 Ticket Description & Conversation Thread")
                 if ticket_desc and ticket_desc not in ("nan", "None", ""):
+                    # Detect if there are multiple replies/lines or a single block
+                    desc_paragraphs = [p.strip() for p in ticket_desc.split("\n") if p.strip()]
+                    initial_msg = desc_paragraphs[0] if desc_paragraphs else ticket_desc
+                    
                     st.markdown(f"""
                     <div class="conversation-box">
                         <div class="conversation-bubble conversation-bubble-user">
                             <div class="conversation-sender conversation-sender-user">
-                                <span>👤 Initial Request by {creator}</span>
-                                <span class="conversation-time">📅 {start_date_val}</span>
+                                <span>👤 Initial Inquiry by {creator}</span>
+                                <span class="conversation-time">📅 Opened: {start_date_val}</span>
                             </div>
-                            <div class="conversation-text">{ticket_desc}</div>
+                            <div class="conversation-text">{initial_msg}</div>
                         </div>
                         <div class="conversation-bubble conversation-bubble-support">
                             <div class="conversation-sender conversation-sender-support">
-                                <span>🛠️ Support Response (Awaiting User Info)</span>
-                                <span class="conversation-time">⏱️ Pending {aging} days</span>
+                                <span>👨‍💻 Last Reply / Investigation by Ticket Owner: <strong>{ticket_owner}</strong></span>
+                                <span class="conversation-time">⏱️ Status: Awaiting User Info ({aging} days)</span>
                             </div>
-                            <div class="conversation-text">Ticket has been investigated and marked 'Awaiting User Info'. Follow-up reminder has been drafted to resolve pending blockers with the creator.</div>
+                            <div class="conversation-text"><strong>Latest Status Update:</strong> Ticket investigated by {ticket_owner}. Currently waiting on user clarification or confirmation from {creator} to proceed with resolution.</div>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-                else:
-                    st.info("No recorded conversation or description text attached to this ticket in the uploaded Excel file.")
 
-                # Section 2: Outgoing Follow-Up Email Message
+                    if len(desc_paragraphs) > 1:
+                        with st.expander("📋 Full Raw Description Text", expanded=False):
+                            st.write(ticket_desc)
+                else:
+                    st.info(f"No specific description text was attached to ticket #{t_num} in the uploaded Excel file.")
+
+                # Section 3: Outgoing Follow-Up Email Message
                 st.markdown("###### ✉️ Outgoing Follow-Up Reminder Draft")
                 st.text_area("Subject", item["email_subject"], key=f"subj_{t_num}", height=68, disabled=True)
                 st.text_area("Body", item["email_body"], key=f"body_{t_num}", height=180, disabled=True)
+
 
 
     st.divider()
