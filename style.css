@@ -922,6 +922,74 @@ header {
     color: #ffffff !important;
 }
 
+/* Status: Not Sent (Light Blue) */
+.reminder-card-not-sent {
+    background: #f0f9ff;
+    border: 1.5px solid #bae6fd;
+    border-left: 5px solid #0284c7;
+    border-radius: 8px;
+    padding: 0.85rem;
+    margin: 0.45rem 0;
+    transition: all 0.2s ease;
+}
+
+.reminder-badge-not-sent {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #7dd3fc;
+    border-radius: 12px;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* Status: Sent (Red) */
+.reminder-card-sent {
+    background: #fef2f2;
+    border: 1.5px solid #fecaca;
+    border-left: 5px solid #dc2626;
+    border-radius: 8px;
+    padding: 0.85rem;
+    margin: 0.45rem 0;
+    transition: all 0.2s ease;
+}
+
+.reminder-badge-sent {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #f87171;
+    border-radius: 12px;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.reminder-outlook-link-resend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.8rem;
+    background: #dc2626;
+    color: #ffffff !important;
+    text-decoration: none !important;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: background 0.2s ease;
+}
+
+.reminder-outlook-link-resend:hover {
+    background: #b91c1c;
+    color: #ffffff !important;
+}
+
+
 /* =====================================================
    SQLite Database & Demo Data Mode Styles
    ===================================================== */
@@ -1264,7 +1332,7 @@ header {
         flex-direction: column !important;
     }
 
-    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+    div[data-testid="stVerticalBlockBorderWrapper"]>div {
         height: 100% !important;
         display: flex !important;
         flex-direction: column !important;
@@ -1342,7 +1410,7 @@ header {
     }
 
     /* Primary button inside Quick Start */
-    div[data-testid="stButton"] > button[kind="primary"] {
+    div[data-testid="stButton"]>button[kind="primary"] {
         background: #2563eb !important;
         color: #ffffff !important;
         border: none !important;
@@ -1359,7 +1427,7 @@ header {
         width: 100% !important;
     }
 
-    div[data-testid="stButton"] > button[kind="primary"]:hover {
+    div[data-testid="stButton"]>button[kind="primary"]:hover {
         background: #1d4ed8 !important;
         transform: translateY(-1px) !important;
         box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35) !important;

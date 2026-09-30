@@ -63,10 +63,13 @@ from db_service import (
     DB_PATH,
     DEMO_FOLDER_PATH,
     export_database_to_excel_folder,
+    get_sent_reminders_dataframe,
+    get_sent_reminders_map,
     get_sqlite_stats,
     init_database,
     load_all_from_sqlite,
     load_from_demo_folder,
+    record_sent_reminder,
     save_all_to_sqlite,
 )
 
@@ -1507,7 +1510,7 @@ with tab3:
         with c_set1:
             cfg_sender_name = st.text_input("Sender Name", value="Sandeep Yadav", key="rem_sender_name")
             cfg_sender_company = st.text_input("Company Name", value="United Tyrekrafts Pvt. Ltd.", key="rem_sender_company")
-            cfg_sender_email = st.text_input("Sender Email Address", value="sandeep.yadav@unitread.co.in", key="rem_sender_email")
+            cfg_sender_email = st.text_input("Sender Email Address", value=os.environ.get("SENDER_EMAIL", "utkerp@outlook.com"), key="rem_sender_email")
         with c_set2:
             cfg_smtp_host = st.text_input("SMTP Server (for direct 1-click background sending)", value=os.environ.get("SMTP_HOST", "smtp.office365.com"), key="rem_smtp_host")
             cfg_smtp_port = st.number_input("SMTP Port", value=int(os.environ.get("SMTP_PORT", 587)), step=1, key="rem_smtp_port")
@@ -1538,16 +1541,20 @@ with tab3:
     matched_count = sum(1 for item in reminder_list if item["matched_email"])
     unmatched_count = len(reminder_list) - matched_count
 
+    # Load persistent sent reminder records from SQLite
+    sent_reminders_map = get_sent_reminders_map()
+    total_sent_in_db = len(sent_reminders_map)
+
     # Bulk Action Bar
     rcol1, rcol2, rcol3 = st.columns([2, 1, 1])
     with rcol1:
-        st.markdown(f"**Tickets in view:** `{len(reminder_list)}` | **Emails Matched:** `{matched_count}` | **Missing Email:** `{unmatched_count}`")
+        st.markdown(f"**Tickets in view:** `{len(reminder_list)}` | **Emails Matched:** `{matched_count}` | **Already Sent:** `{sum(1 for it in reminder_list if str(it['ticket_no']).strip() in sent_reminders_map)}`")
     with rcol2:
         send_all_btn = st.button("🚀 Send All Reminders (Single Click)", type="primary", use_container_width=True, key="btn_send_all_reminders")
     with rcol3:
         show_preview = st.checkbox("Show Email Cards", value=True, key="chk_show_reminder_preview")
 
-    # Handle Send All Click
+    # Handle Send All Click (via SMTP background)
     if send_all_btn:
         if not reminder_list:
             st.info("No tickets in current view to send reminders for.")
@@ -1555,7 +1562,7 @@ with tab3:
             st.warning(
                 f"🔑 **SMTP Password Needed for Bulk Background Sending**\n\n"
                 f"To send emails automatically in the background from `{cfg_sender_email}`, please expand **'⚙️ Sender & Email Settings'** above and enter your email/app password.\n\n"
-                f"💡 **Immediate Alternative**: Click the **'✉️ Send via Outlook'** button next to any ticket below to open it pre-filled in your mail client with 1 click!"
+                f"💡 **Immediate Alternative**: Click the **'✉️ Send via Outlook'** button next to each ticket below to open it pre-filled and log it with 1 click!"
             )
         else:
             with st.spinner(f"Sending reminders from {cfg_sender_email}..."):
@@ -1578,6 +1585,14 @@ with tab3:
                         )
                         if ok:
                             sent_success += 1
+                            record_sent_reminder(
+                                ticket_number=item["ticket_no"],
+                                creator_name=item["creator"],
+                                recipient_email=recipient,
+                                subject=item["email_subject"],
+                                sent_by=cfg_sender_email,
+                                delivery_mode="SMTP"
+                            )
                         else:
                             sent_failed += 1
                             error_msgs.append(f"{item['ticket_no']} ({recipient}): {msg}")
@@ -1587,44 +1602,98 @@ with tab3:
                     
                     progress_bar.progress((idx + 1) / len(reminder_list))
                 
+                # Refresh map after bulk send
+                sent_reminders_map = get_sent_reminders_map()
+                
                 if sent_success > 0:
-                    st.success(f"🎉 **Completed**: Successfully sent {sent_success} reminder emails from {cfg_sender_email}!")
+                    st.success(f"🎉 **Completed**: Successfully sent & logged {sent_success} reminder emails to SQLite!")
                 if sent_failed > 0:
                     st.error(f"⚠️ {sent_failed} email(s) could not be sent:")
                     for err in error_msgs[:5]:
                         st.caption(f"- {err}")
 
+    # =========================================================================
+    # 📬 SENT MAILS HISTORY & LOGS (Prevents Overriding & Provides Full Visibility)
+    # =========================================================================
+    with st.expander(f"📬 Sent Reminders History ({total_sent_in_db} logged in SQLite)", expanded=False):
+        sent_df = get_sent_reminders_dataframe()
+        if not sent_df.empty:
+            st.markdown("Below is the persistent audit trail of all reminders sent. Each ticket is permanently logged so you won't duplicate or override sent notices.")
+            st.dataframe(sent_df, use_container_width=True, hide_index=True)
+            col_dl1, col_dl2 = st.columns([1, 3])
+            with col_dl1:
+                csv_sent = sent_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Export Sent Log (CSV)",
+                    data=csv_sent,
+                    file_name="sent_reminders_log.csv",
+                    mime="text/csv",
+                    key="btn_download_sent_log"
+                )
+        else:
+            st.info("No reminders sent yet. Once you send via Outlook or SMTP, the details will appear here automatically.")
+
     # Reminder Cards / Direct Outlook buttons
     if show_preview and reminder_list:
         st.markdown("#### 📬 Ticket Follow-Up Queue")
+        st.caption("🔴 **Red Border / Badge**: Mail has already been sent (persisted in SQLite) | 🔵 **Light Blue Border / Badge**: Reminder not yet sent")
+        
         for item in reminder_list:
-            t_num = item["ticket_no"]
+            t_num = str(item["ticket_no"]).strip()
             creator = item["creator"]
             matched_addr = item["matched_email"]
             t_subj = item["subject"]
             aging = item["aging"]
             mailto_link = item["mailto_url"]
             
-            c_left, c_right = st.columns([4, 1.2])
+            # Check sent status in SQLite
+            is_sent = t_num in sent_reminders_map
+            sent_info = sent_reminders_map.get(t_num)
+            
+            # Card style: Red if sent, Light Blue if not sent
+            card_class = "reminder-card-sent" if is_sent else "reminder-card-not-sent"
+            status_badge = (
+                f'<span class="reminder-badge-sent">🔴 Sent ({sent_info["sent_at"][:16] if sent_info else "Yes"})</span>' 
+                if is_sent 
+                else '<span class="reminder-badge-not-sent">🔵 Not Sent</span>'
+            )
+            email_badge = f'<span class="reminder-email-tag">✉️ {matched_addr}</span>' if matched_addr else '<span class="reminder-email-missing">⚠️ Email not found in directory</span>'
+            
+            c_left, c_right = st.columns([3.8, 1.4])
             with c_left:
-                email_badge = f'<span class="reminder-email-tag">✉️ {matched_addr}</span>' if matched_addr else '<span class="reminder-email-missing">⚠️ Email not found in directory</span>'
                 st.markdown(f"""
-                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.8rem; margin: 0.4rem 0;">
-                    <div>
+                <div class="{card_class}">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
                         <strong>🎫 {t_num}</strong> — {t_subj}
+                        {status_badge}
                     </div>
-                    <div style="font-size: 0.85rem; color: #475569; margin-top: 0.3rem;">
+                    <div style="font-size: 0.85rem; color: #475569; margin-top: 0.2rem;">
                         👤 Creator: <strong>{creator}</strong> {email_badge} • ⏱️ {aging} days
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             with c_right:
                 if mailto_link:
-                    st.markdown(f"""
-                    <div style="margin-top: 0.6rem;">
-                        <a href="{mailto_link}" class="reminder-outlook-link" target="_blank">✉️ Send via Outlook</a>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    btn_text = "✉️ Re-send via Outlook" if is_sent else "✉️ Send via Outlook"
+                    btn_type = "secondary" if is_sent else "primary"
+                    
+                    if st.button(btn_text, key=f"btn_send_out_{t_num}", type=btn_type, use_container_width=True):
+                        # 1. Log to SQLite
+                        record_sent_reminder(
+                            ticket_number=t_num,
+                            creator_name=creator,
+                            recipient_email=matched_addr or "",
+                            subject=item["email_subject"],
+                            sent_by=cfg_sender_email,
+                            delivery_mode="Outlook"
+                        )
+                        # 2. Trigger mailto in client's browser
+                        st.markdown(f"""
+                        <meta http-equiv="refresh" content="0; url='{mailto_link}'" />
+                        <script>window.location.href = "{mailto_link}";</script>
+                        """, unsafe_allow_html=True)
+                        st.toast(f"✅ Logged reminder for {t_num} & opening Outlook...", icon="✉️")
+                        st.rerun()
                 else:
                     st.caption("No email mapped")
 
@@ -1635,6 +1704,7 @@ with tab3:
     st.divider()
     st.markdown("#### 📋 Awaiting User Info Tickets Table")
     st.dataframe(wait_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
+
 
 with tab4:
     # Filters for Hold

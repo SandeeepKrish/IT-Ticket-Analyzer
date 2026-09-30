@@ -55,7 +55,88 @@ EXCEL_FILE_NAMES = {
 def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
     """Ensure directory exists and return an SQLite connection."""
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    return sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path)
+    # Ensure sent_reminders log table always exists
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sent_reminders (
+            ticket_number TEXT PRIMARY KEY,
+            creator_name TEXT,
+            recipient_email TEXT,
+            subject TEXT,
+            sent_by TEXT,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            delivery_mode TEXT DEFAULT 'Outlook'
+        )
+    """)
+    conn.commit()
+    return conn
+
+
+def record_sent_reminder(
+    ticket_number: str,
+    creator_name: str,
+    recipient_email: str,
+    subject: str,
+    sent_by: str = "utkerp@outlook.com",
+    delivery_mode: str = "Outlook",
+    db_path: str = DB_PATH
+) -> bool:
+    """Record or update a ticket email reminder dispatch in SQLite."""
+    if not ticket_number:
+        return False
+    try:
+        conn = get_connection(db_path)
+        with conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO sent_reminders (
+                    ticket_number, creator_name, recipient_email, subject, sent_by, sent_at, delivery_mode
+                ) VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'), ?)
+            """, (str(ticket_number).strip(), creator_name, recipient_email, subject, sent_by, delivery_mode))
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def get_sent_reminders_map(db_path: str = DB_PATH) -> Dict[str, Dict[str, Any]]:
+    """Return dictionary of ticket_number -> reminder record for quick lookup."""
+    try:
+        conn = get_connection(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT ticket_number, creator_name, recipient_email, subject, sent_by, sent_at, delivery_mode FROM sent_reminders")
+        rows = cursor.fetchall()
+        conn.close()
+        return {
+            str(r[0]).strip(): {
+                "ticket_number": str(r[0]).strip(),
+                "creator_name": r[1],
+                "recipient_email": r[2],
+                "subject": r[3],
+                "sent_by": r[4],
+                "sent_at": r[5],
+                "delivery_mode": r[6]
+            }
+            for r in rows
+        }
+    except Exception:
+        return {}
+
+
+def get_sent_reminders_dataframe(db_path: str = DB_PATH) -> pd.DataFrame:
+    """Return sent reminders history as a clean pandas DataFrame."""
+    try:
+        conn = get_connection(db_path)
+        df = pd.read_sql_query(
+            "SELECT ticket_number AS 'Ticket Number', creator_name AS 'Creator Name', "
+            "recipient_email AS 'Recipient Email', subject AS 'Email Subject', "
+            "sent_by AS 'Sent By', sent_at AS 'Sent At', delivery_mode AS 'Method' "
+            "FROM sent_reminders ORDER BY sent_at DESC", 
+            conn
+        )
+        conn.close()
+        return df
+    except Exception:
+        return pd.DataFrame()
 
 
 def generate_seed_data() -> Dict[str, pd.DataFrame]:
