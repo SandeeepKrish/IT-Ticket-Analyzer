@@ -1875,7 +1875,7 @@ with tab3:
                             )
                             ok, msg = send_smtp_email(
                                 smtp_host=cfg_smtp_host,
-                                smtp_port=int(cfg_smtp_port),
+                                smtp_port=cfg_smtp_port,
                                 sender_email=cfg_sender_email,
                                 sender_password=cfg_smtp_password,
                                 recipient_email=c_email,
@@ -2051,7 +2051,7 @@ with tab3:
                         if recipient:
                             ok, msg = send_smtp_email(
                                 smtp_host=cfg_smtp_host,
-                                smtp_port=int(cfg_smtp_port),
+                                smtp_port=cfg_smtp_port,
                                 sender_email=cfg_sender_email,
                                 sender_password=cfg_smtp_password,
                                 recipient_email=recipient,
