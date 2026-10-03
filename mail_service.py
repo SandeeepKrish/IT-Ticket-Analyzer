@@ -107,7 +107,8 @@ def generate_reminder_email(
     ticket_row: pd.Series, 
     sender_name: str = "Sandeep Yadav", 
     company_name: str = "United Tyrekrafts Pvt. Ltd.", 
-    sender_email: str = "utkerp@outlook.com"
+    sender_email: str = "utkerp@outlook.com",
+    sender_phone: str = "9682548514"
 ) -> Tuple[str, str]:
     """Generate subject and professional body for reminder email to ticket creator."""
     ticket_no = str(ticket_row.get("Ticket Number", "")).strip()
@@ -128,9 +129,10 @@ def generate_reminder_email(
         f"  • Department: {dept}\n"
         f"  • Start Date: {start_date}\n"
         f"  • Aging: {aging} days\n\n"
-        f"Please reply to your ticket so our support team can take the next steps:\n"
+        f"Please reply to your ticket as soon as possible as we have to clear awaiting user info, so our support team can take the next steps:\n"
         f"  1. If your problem has been RESOLVED, please confirm so we can close this ticket.\n"
         f"  2. If the problem is NOT SOLVED, please let us know your pending questions/issues so we can solve it for you immediately.\n\n"
+        f"Please reply to this on ticket as this has to be cleared. If any doubt, contact us on {sender_phone}.\n\n"
         f"Thank you,\n"
         f"{sender_name}\n"
         f"{company_name}\n"

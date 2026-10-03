@@ -1659,6 +1659,7 @@ with tab3:
             cfg_sender_name = st.text_input("Sender Name", value="Sandeep Yadav", key="rem_sender_name")
             cfg_sender_company = st.text_input("Company Name", value="United Tyrekrafts Pvt. Ltd.", key="rem_sender_company")
             cfg_sender_email = st.text_input("Sender Email Address", value=os.environ.get("SENDER_EMAIL", "utkerp@outlook.com"), key="rem_sender_email")
+            cfg_sender_phone = st.text_input("Contact Phone Number", value=os.environ.get("SENDER_PHONE", "9682548514"), key="rem_sender_phone")
         with c_set2:
             cfg_smtp_host = st.text_input("SMTP Server (for direct 1-click background sending)", value=os.environ.get("SMTP_HOST", "smtp.office365.com"), key="rem_smtp_host")
             cfg_smtp_port = st.number_input("SMTP Port", value=int(os.environ.get("SMTP_PORT", "587")), step=1, key="rem_smtp_port")
@@ -1669,7 +1670,7 @@ with tab3:
     for _, r in wait_view.iterrows():
         creator_val = str(r.get("Ticket Creator", "")).strip()
         matched_email = find_creator_email(creator_val, email_directory)
-        sub_text, body_text = generate_reminder_email(r, cfg_sender_name, cfg_sender_company, cfg_sender_email)
+        sub_text, body_text = generate_reminder_email(r, cfg_sender_name, cfg_sender_company, cfg_sender_email, cfg_sender_phone)
         
         mailto_url = generate_mailto_url(matched_email, sub_text, body_text) if matched_email else ""
             
