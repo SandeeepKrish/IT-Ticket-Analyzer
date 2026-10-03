@@ -59,45 +59,20 @@ from mail_service import (
     generate_reminder_email,
     send_smtp_email,
 )
-try:
-    from db_service import (
-        DB_PATH,
-        DEMO_FOLDER_PATH,
-        export_database_to_excel_folder,
-        get_sent_reminders_dataframe,
-        get_sent_reminders_map,
-        get_sqlite_stats,
-        init_database,
-        load_all_from_sqlite,
-        load_from_demo_folder,
-        record_sent_reminder,
-        remove_sent_reminder,
-        save_all_to_sqlite,
-    )
-except ImportError:
-    from db_service import (  # type: ignore
-        DB_PATH,
-        DEMO_FOLDER_PATH,
-        export_database_to_excel_folder,
-        get_sent_reminders_dataframe,
-        get_sent_reminders_map,
-        get_sqlite_stats,
-        init_database,
-        load_all_from_sqlite,
-        load_from_demo_folder,
-        record_sent_reminder,
-        save_all_to_sqlite,
-    )
-    def remove_sent_reminder(ticket_number: str) -> bool:  # type: ignore
-        import sqlite3
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            with conn:
-                conn.execute("DELETE FROM sent_reminders WHERE ticket_number = ?", (str(ticket_number).strip(),))
-            conn.close()
-            return True
-        except Exception:
-            return False
+from db_service import (
+    DB_PATH,
+    DEMO_FOLDER_PATH,
+    export_database_to_excel_folder,
+    get_sent_reminders_dataframe,
+    get_sent_reminders_map,
+    get_sqlite_stats,
+    init_database,
+    load_all_from_sqlite,
+    load_from_demo_folder,
+    record_sent_reminder,
+    remove_sent_reminder,
+    save_all_to_sqlite,
+)
 
 
 # Auto-initialize SQLite database with demo data if empty
@@ -557,7 +532,7 @@ def get_filtered_data(df: pd.DataFrame, owner_filter: Any, year_filter=None, mon
     if year_filter is not None and month_filter is not None:
         filtered_df = filter_by_date(filtered_df, year_filter, month_filter)
     
-    return filtered_df
+    return pd.DataFrame(filtered_df)
 
 
 
@@ -1686,7 +1661,7 @@ with tab3:
             cfg_sender_email = st.text_input("Sender Email Address", value=os.environ.get("SENDER_EMAIL", "utkerp@outlook.com"), key="rem_sender_email")
         with c_set2:
             cfg_smtp_host = st.text_input("SMTP Server (for direct 1-click background sending)", value=os.environ.get("SMTP_HOST", "smtp.office365.com"), key="rem_smtp_host")
-            cfg_smtp_port = st.number_input("SMTP Port", value=int(os.environ.get("SMTP_PORT", 587)), step=1, key="rem_smtp_port")
+            cfg_smtp_port = st.number_input("SMTP Port", value=int(os.environ.get("SMTP_PORT", "587")), step=1, key="rem_smtp_port")
             cfg_smtp_password = st.text_input("SMTP / App Password (Optional)", type="password", value=os.environ.get("SMTP_PASSWORD", ""), key="rem_smtp_password", help="Enter app password to send directly in background without opening Outlook")
 
     # Match tickets with emails

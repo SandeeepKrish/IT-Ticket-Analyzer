@@ -543,13 +543,13 @@ def generate_seed_data() -> Dict[str, pd.DataFrame]:
             master_df[col] = "—"
 
     # Category filters
-    wip_df = master_df[master_df["Status"] == "Work in Progress"].copy().reset_index(drop=True)
-    dev_df = master_df[master_df["Status"] == "Under Development"].copy().reset_index(drop=True)
-    wait_df = master_df[master_df["Status"] == "Awaiting User Info"].copy().reset_index(drop=True)
-    hold_df = master_df[master_df["Status"] == "Hold"].copy().reset_index(drop=True)
-    open_df = master_df[master_df["Status"] == "Open"].copy().reset_index(drop=True)
-    pending_df = master_df[master_df["Status"] == "Pending"].copy().reset_index(drop=True)
-    closed_df = master_df[master_df["Status"] == "Closed"].copy().reset_index(drop=True)
+    wip_df = pd.DataFrame(master_df[master_df["Status"] == "Work in Progress"].copy().reset_index(drop=True))
+    dev_df = pd.DataFrame(master_df[master_df["Status"] == "Under Development"].copy().reset_index(drop=True))
+    wait_df = pd.DataFrame(master_df[master_df["Status"] == "Awaiting User Info"].copy().reset_index(drop=True))
+    hold_df = pd.DataFrame(master_df[master_df["Status"] == "Hold"].copy().reset_index(drop=True))
+    open_df = pd.DataFrame(master_df[master_df["Status"] == "Open"].copy().reset_index(drop=True))
+    pending_df = pd.DataFrame(master_df[master_df["Status"] == "Pending"].copy().reset_index(drop=True))
+    closed_df = pd.DataFrame(master_df[master_df["Status"] == "Closed"].copy().reset_index(drop=True))
 
     # Mail Directory Mapping
     mail_to_data = [
