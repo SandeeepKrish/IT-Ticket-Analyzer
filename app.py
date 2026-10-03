@@ -58,6 +58,7 @@ importlib.reload(mail_service)
 from mail_service import (
     build_email_directory,
     find_creator_email,
+    generate_consolidated_creator_reminder,
     generate_mailto_url,
     generate_reminder_email,
     send_smtp_email,
@@ -1701,72 +1702,16 @@ with tab3:
     sent_reminders_map = get_sent_reminders_map()
     total_sent_in_db = len(sent_reminders_map)
 
-    # Bulk Action Bar
-    rcol1, rcol2, rcol3 = st.columns([2, 1, 1])
-    with rcol1:
-        st.markdown(f"**Tickets in view:** `{len(reminder_list)}` | **Emails Matched:** `{matched_count}` | **Already Sent:** `{sum(1 for it in reminder_list if str(it['ticket_no']).strip() in sent_reminders_map)}`")
-    with rcol2:
-        send_all_btn = st.button("🚀 Send All Reminders (Single Click)", type="primary", use_container_width=True, key="btn_send_all_reminders")
-    with rcol3:
-        show_preview = st.checkbox("Show Email Cards", value=True, key="chk_show_reminder_preview")
+    # Build creator groups
+    grouped_creators: Dict[str, List[Dict[str, Any]]] = {}
+    for item in reminder_list:
+        c_name = str(item["creator"]).strip() or "Unknown Creator"
+        if c_name not in grouped_creators:
+            grouped_creators[c_name] = []
+        grouped_creators[c_name].append(item)
 
-    # Handle Send All Click (via SMTP background)
-    if send_all_btn:
-        if not reminder_list:
-            st.info("No tickets in current view to send reminders for.")
-        elif not cfg_smtp_password:
-            st.warning(
-                f"🔑 **SMTP Password Needed for Bulk Background Sending**\n\n"
-                f"To send emails automatically in the background from `{cfg_sender_email}`, please expand **'⚙️ Sender & Email Settings'** above and enter your email/app password.\n\n"
-                f"💡 **Immediate Alternative**: Click the **'✉️ Send via Outlook'** button next to each ticket below to open it pre-filled and log it with 1 click!"
-            )
-        else:
-            with st.spinner(f"Sending reminders from {cfg_sender_email}..."):
-                sent_success = 0
-                sent_failed = 0
-                error_msgs = []
-                progress_bar = st.progress(0)
-                
-                for idx, item in enumerate(reminder_list):
-                    recipient = item["matched_email"]
-                    if recipient:
-                        ok, msg = send_smtp_email(
-                            smtp_host=cfg_smtp_host,
-                            smtp_port=int(cfg_smtp_port),
-                            sender_email=cfg_sender_email,
-                            sender_password=cfg_smtp_password,
-                            recipient_email=recipient,
-                            subject=item["email_subject"],
-                            body=item["email_body"]
-                        )
-                        if ok:
-                            sent_success += 1
-                            record_sent_reminder(
-                                ticket_number=item["ticket_no"],
-                                creator_name=item["creator"],
-                                recipient_email=recipient,
-                                subject=item["email_subject"],
-                                sent_by=cfg_sender_email,
-                                delivery_mode="SMTP"
-                            )
-                        else:
-                            sent_failed += 1
-                            error_msgs.append(f"{item['ticket_no']} ({recipient}): {msg}")
-                    else:
-                        sent_failed += 1
-                        error_msgs.append(f"{item['ticket_no']} ({item['creator']}): No email address found")
-                    
-                    progress_bar.progress((idx + 1) / len(reminder_list))
-                
-                # Refresh map after bulk send
-                sent_reminders_map = get_sent_reminders_map()
-                
-                if sent_success > 0:
-                    st.success(f"🎉 **Completed**: Successfully sent & logged {sent_success} reminder emails to SQLite!")
-                if sent_failed > 0:
-                    st.error(f"⚠️ {sent_failed} email(s) could not be sent:")
-                    for err in error_msgs[:5]:
-                        st.caption(f"- {err}")
+    sorted_creator_tuples = sorted(grouped_creators.items(), key=lambda x: (len(x[1]), x[0].lower()), reverse=True)
+    multi_creators_count = sum(1 for _, items in sorted_creator_tuples if len(items) > 1)
 
     # =========================================================================
     # 📬 SENT MAILS HISTORY & LOGS (Prevents Overriding & Provides Full Visibility)
@@ -1789,116 +1734,383 @@ with tab3:
         else:
             st.info("No reminders sent yet. Once you send via Outlook or SMTP, the details will appear here automatically.")
 
-    # Reminder Cards / Direct Outlook buttons
-    if show_preview and reminder_list:
-        st.markdown("#### 📬 Ticket Follow-Up Queue")
-        st.caption("🔴 **Red Border / Badge**: Mail has already been sent (persisted in SQLite) | 🔵 **Light Blue Border / Badge**: Reminder not yet sent")
-        
-        for item in reminder_list:
-            t_num = str(item["ticket_no"]).strip()
-            creator = item["creator"]
-            matched_addr = item["matched_email"]
-            t_subj = item["subject"]
-            aging = item["aging"]
-            mailto_link = item["mailto_url"]
-            
-            # Check sent status in SQLite
-            is_sent = t_num in sent_reminders_map
-            sent_info = sent_reminders_map.get(t_num)
-            
-            # Card style: Red if sent, Light Blue if not sent
-            card_class = "reminder-card-sent" if is_sent else "reminder-card-not-sent"
-            status_badge = (
-                f'<span class="reminder-badge-sent">🔴 Sent ({sent_info["sent_at"][:16] if sent_info else "Yes"})</span>' 
-                if is_sent 
-                else '<span class="reminder-badge-not-sent">🔵 Not Sent</span>'
-            )
-            email_badge = f'<span class="reminder-email-tag">✉️ {matched_addr}</span>' if matched_addr else '<span class="reminder-email-missing">⚠️ Email not found in directory</span>'
-            
-            c_left, c_right = st.columns([3.6, 1.6])
-            with c_left:
-                st.markdown(f"""
-                <div class="{card_class}">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
-                        <strong>🎫 {t_num}</strong> — {t_subj}
-                        {status_badge}
-                    </div>
-                    <div style="font-size: 0.85rem; color: #475569; margin-top: 0.2rem;">
-                        👤 Creator: <strong>{creator}</strong> {email_badge} • ⏱️ {aging} days
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            with c_right:
-                if mailto_link:
-                    # 1. Direct browser mailto link - guaranteed to launch Outlook immediately on click
-                    outlook_btn_cls = "reminder-outlook-link-resend" if is_sent else "reminder-outlook-link"
-                    outlook_btn_txt = "✉️ Re-open in Outlook" if is_sent else "✉️ Open in Outlook"
-                    
+    st.markdown("#### 📬 Ticket Follow-Up Queue")
+    st.caption("🔴 **Red**: Mail already sent (persisted in SQLite) | 🟡 **Yellow**: Partially sent | 🔵 **Light Blue**: Not yet sent")
+
+    # Dual Dispatch Modes: Grouped Consolidated vs Individual Tickets
+    tab_grouped_rem, tab_single_rem = st.tabs([
+        f"👥 Grouped by Creator — Consolidated 1 Email ({len(grouped_creators)} Creators • {multi_creators_count} with >1 Tickets)",
+        f"🎫 Individual Tickets — 1 Email per Ticket ({len(reminder_list)} Tickets 1-by-1)"
+    ])
+
+    # =========================================================================
+    # TAB 1: GROUPED BY CREATOR (CONSOLIDATED 1 EMAIL PER PERSON)
+    # =========================================================================
+    with tab_grouped_rem:
+        st.markdown("""
+        <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.8rem; color: #166534; font-size: 0.88rem;">
+            💡 <strong>1-Click Consolidated Reminders:</strong> If a person has multiple tickets awaiting info (e.g. <strong>Vijay Tanpure with 6 tickets</strong>), click <strong>'✉️ Open Consolidated in Outlook'</strong> to launch a single email containing all their ticket numbers and subjects!
+        </div>
+        """, unsafe_allow_html=True)
+
+        g_col1, g_col2, g_col3 = st.columns([2.5, 1.4, 0.9])
+        with g_col1:
+            only_multi = st.checkbox("🔥 Focus only on creators with multiple (>1) tickets", value=False, key="chk_only_multi_creators")
+        with g_col2:
+            send_all_cons_btn = st.button("🚀 Send All Consolidated (SMTP)", type="primary", use_container_width=True, key="btn_send_all_cons")
+        with g_col3:
+            show_cons_cards = st.checkbox("Show Cards", value=True, key="chk_show_cons_cards")
+
+        creators_to_process = [tup for tup in sorted_creator_tuples if not only_multi or len(tup[1]) > 1]
+
+        # Bulk SMTP Dispatch for Consolidated Reminders
+        if send_all_cons_btn:
+            if not creators_to_process:
+                st.info("No creators match the current view to send consolidated reminders for.")
+            elif not cfg_smtp_password:
+                st.warning(
+                    f"🔑 **SMTP Password Needed for Bulk Background Sending**\n\n"
+                    f"To send emails automatically in the background from `{cfg_sender_email}`, please expand **'⚙️ Sender & Email Settings'** above and enter your email/app password.\n\n"
+                    f"💡 **Immediate Alternative**: Click the **'✉️ Open Consolidated in Outlook'** button on any creator card below to launch Outlook with 1 click!"
+                )
+            else:
+                with st.spinner(f"Sending consolidated emails from {cfg_sender_email}..."):
+                    c_success = 0
+                    c_failed = 0
+                    c_errors = []
+                    cons_prog = st.progress(0)
+                    for idx, (c_name, items) in enumerate(creators_to_process):
+                        c_email = items[0]["matched_email"]
+                        if c_email:
+                            c_raw_rows = [it["raw_row"] for it in items]
+                            cons_sub, cons_body = generate_consolidated_creator_reminder(
+                                creator_name=c_name,
+                                ticket_items=c_raw_rows,
+                                sender_name=cfg_sender_name,
+                                company_name=cfg_sender_company,
+                                sender_email=cfg_sender_email,
+                                sender_phone=cfg_sender_phone
+                            )
+                            ok, msg = send_smtp_email(
+                                smtp_host=cfg_smtp_host,
+                                smtp_port=int(cfg_smtp_port),
+                                sender_email=cfg_sender_email,
+                                sender_password=cfg_smtp_password,
+                                recipient_email=c_email,
+                                subject=cons_sub,
+                                body=cons_body
+                            )
+                            if ok:
+                                c_success += 1
+                                for it in items:
+                                    record_sent_reminder(
+                                        ticket_number=str(it["ticket_no"]).strip(),
+                                        creator_name=c_name,
+                                        recipient_email=c_email,
+                                        subject=cons_sub,
+                                        sent_by=cfg_sender_email,
+                                        delivery_mode="SMTP (Consolidated)"
+                                    )
+                            else:
+                                c_failed += 1
+                                c_errors.append(f"{c_name} ({c_email}): {msg}")
+                        else:
+                            c_failed += 1
+                            c_errors.append(f"{c_name}: No email found in directory")
+                        cons_prog.progress((idx + 1) / len(creators_to_process))
+
+                    sent_reminders_map = get_sent_reminders_map()
+                    if c_success > 0:
+                        st.success(f"🎉 **Completed**: Sent consolidated emails to {c_success} creators (all tickets logged in SQLite)!")
+                    if c_failed > 0:
+                        st.error(f"⚠️ {c_failed} email(s) could not be sent:")
+                        for err in c_errors[:5]:
+                            st.caption(f"- {err}")
+
+        # Render Creator Cards
+        if show_cons_cards and creators_to_process:
+            for idx_c, (c_name, items) in enumerate(creators_to_process):
+                c_email = items[0]["matched_email"]
+                c_raw_rows = [it["raw_row"] for it in items]
+                cons_sub, cons_body = generate_consolidated_creator_reminder(
+                    creator_name=c_name,
+                    ticket_items=c_raw_rows,
+                    sender_name=cfg_sender_name,
+                    company_name=cfg_sender_company,
+                    sender_email=cfg_sender_email,
+                    sender_phone=cfg_sender_phone
+                )
+                cons_mailto = generate_mailto_url(c_email, cons_sub, cons_body) if c_email else ""
+
+                all_sent = all(str(it["ticket_no"]).strip() in sent_reminders_map for it in items)
+                sent_count = sum(1 for it in items if str(it["ticket_no"]).strip() in sent_reminders_map)
+
+                if all_sent:
+                    card_class = "reminder-card-sent"
+                    status_badge = f'<span class="reminder-badge-sent">🔴 All {len(items)} Sent</span>'
+                    outlook_btn_cls = "reminder-outlook-link-resend"
+                    outlook_btn_txt = "✉️ Re-open Consolidated in Outlook"
+                elif sent_count > 0:
+                    card_class = "reminder-card-partial"
+                    status_badge = f'<span class="reminder-badge-partial">🟡 {sent_count} of {len(items)} Sent</span>'
+                    outlook_btn_cls = "reminder-outlook-link"
+                    outlook_btn_txt = f"✉️ Open Consolidated ({len(items)} Tickets)"
+                else:
+                    card_class = "reminder-card-not-sent"
+                    status_badge = f'<span class="reminder-badge-not-sent">🔵 Not Sent ({len(items)} Tickets)</span>'
+                    outlook_btn_cls = "reminder-outlook-link"
+                    outlook_btn_txt = f"✉️ Open Consolidated ({len(items)} Tickets)"
+
+                count_badge = f'<span class="reminder-count-pill-multi">🔥 {len(items)} Tickets</span>' if len(items) > 1 else f'<span class="reminder-count-pill">1 Ticket</span>'
+                email_badge = f'<span class="reminder-email-tag">✉️ {c_email}</span>' if c_email else '<span class="reminder-email-missing">⚠️ Email not found in directory</span>'
+
+                t_numbers_preview = ", ".join(str(it["ticket_no"]).strip() for it in items[:6])
+                if len(items) > 6:
+                    t_numbers_preview += f" (+{len(items)-6} more)"
+
+                cg_left, cg_right = st.columns([3.4, 1.8])
+                with cg_left:
                     st.markdown(f"""
-                    <div style="margin-top: 0.2rem; margin-bottom: 0.4rem;">
-                        <a href="{mailto_link}" class="{outlook_btn_cls}" style="width: 100%; justify-content: center; box-sizing: border-box;">
-                            {outlook_btn_txt}
-                        </a>
+                    <div class="{card_class}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                            <span>👤 <strong>{c_name}</strong> {count_badge}</span>
+                            {status_badge}
+                        </div>
+                        <div style="font-size: 0.85rem; color: #475569; margin-top: 0.2rem;">
+                            {email_badge} • Tickets: <strong>{t_numbers_preview}</strong>
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # 2. Manual status toggle button: saves to SQLite and turns card Red (or toggles back)
-                    if not is_sent:
-                        if st.button("✅ Mark as Sent", key=f"btn_mark_sent_{t_num}", type="primary", use_container_width=True, help="Click once you send the email in Outlook to turn this card red and log to SQLite"):
-                            record_sent_reminder(
-                                ticket_number=t_num,
-                                creator_name=creator,
-                                recipient_email=matched_addr or "",
-                                subject=item["email_subject"],
-                                sent_by=cfg_sender_email,
-                                delivery_mode="Outlook"
-                            )
-                            st.toast(f"✅ Marked Ticket #{t_num} as Sent in SQLite!", icon="🔴")
-                            st.rerun()
-                    else:
-                        if st.button("↩️ Undo Sent", key=f"btn_undo_sent_{t_num}", type="secondary", use_container_width=True, help="Reset status back to light blue (Not Sent)"):
-                            remove_sent_reminder(t_num)
-                            st.toast(f"Reset Ticket #{t_num} to Not Sent.", icon="🔵")
-                            st.rerun()
-                else:
-                    st.caption("No email mapped")
+                with cg_right:
+                    if cons_mailto:
+                        st.markdown(f"""
+                        <div style="margin-top: 0.2rem; margin-bottom: 0.4rem;">
+                            <a href="{cons_mailto}" class="{outlook_btn_cls}" style="width: 100%; justify-content: center; box-sizing: border-box;">
+                                {outlook_btn_txt}
+                            </a>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-            raw_ticket = item.get("raw_row")
-            ticket_desc = str(raw_ticket.get("Description", "")).strip() if raw_ticket is not None else ""
-            ticket_owner = str(item.get("owner") or (raw_ticket.get("Ticket Owner", "Unassigned") if raw_ticket is not None else "Unassigned")).strip()
-            customer_name = str(raw_ticket.get("Customer Name", "—")).strip() if raw_ticket is not None else "—"
-            start_date_val = str(raw_ticket.get("Start Date", "—")).strip() if raw_ticket is not None else "—"
-            req_date_val = str(raw_ticket.get("Required Date", "—")).strip() if raw_ticket is not None else "—"
-            est_date_val = str(raw_ticket.get("Estimate Resolution Date", "—")).strip() if raw_ticket is not None else "—"
-            priority_val = str(raw_ticket.get("Ticket Priority", "Normal")).strip() if raw_ticket is not None else "Normal"
-            dept_val = str(raw_ticket.get("Ticket Department", "Support")).strip() if raw_ticket is not None else "Support"
-            # Button to trigger the Modal Dialog Popup (Floating above UI in center)
-            if st.button(
-                f"💬 View Conversation & Description for {t_num} ({creator})",
-                key=f"btn_desc_modal_{t_num}",
-                use_container_width=True,
-                help="Click to open full ticket description and conversation in a centered popup modal"
-            ):
-                show_ticket_description_dialog(
-                    t_num=t_num,
-                    creator=creator,
-                    matched_addr=matched_addr,
-                    t_subj=t_subj,
-                    aging=aging,
-                    ticket_owner=ticket_owner,
-                    customer_name=customer_name,
-                    start_date_val=start_date_val,
-                    req_date_val=req_date_val,
-                    est_date_val=est_date_val,
-                    priority_val=priority_val,
-                    dept_val=dept_val,
-                    ticket_desc=ticket_desc,
-                    email_subject=item.get("email_subject", ""),
-                    email_body=item.get("email_body", ""),
-                    mailto_url=mailto_link,
-                    is_sent=is_sent,
-                    cfg_sender_email=cfg_sender_email
+                        # Toggle Mark All as Sent / Undo Sent
+                        btn_col_a, btn_col_b = st.columns([1, 1]) if cfg_smtp_password else (st.container(), None)
+                        if not all_sent:
+                            if st.button(f"✅ Mark All {len(items)} Sent", key=f"btn_mark_all_{idx_c}", type="primary", use_container_width=True):
+                                for it in items:
+                                    record_sent_reminder(
+                                        ticket_number=str(it["ticket_no"]).strip(),
+                                        creator_name=c_name,
+                                        recipient_email=c_email or "",
+                                        subject=cons_sub,
+                                        sent_by=cfg_sender_email,
+                                        delivery_mode="Outlook (Consolidated)"
+                                    )
+                                st.toast(f"✅ Marked {len(items)} tickets for {c_name} as Sent in SQLite!", icon="🔴")
+                                st.rerun()
+                        else:
+                            if st.button(f"↩️ Undo Sent ({len(items)})", key=f"btn_undo_all_{idx_c}", type="secondary", use_container_width=True):
+                                for it in items:
+                                    remove_sent_reminder(str(it["ticket_no"]).strip())
+                                st.toast(f"Reset {len(items)} tickets for {c_name} to Not Sent.", icon="🔵")
+                                st.rerun()
+                    else:
+                        st.caption("No email mapped")
+
+                # Tickets breakdown & email text expander
+                with st.expander(f"📋 View all {len(items)} tickets & Email text for {c_name}", expanded=False):
+                    st.markdown(f"**Email Subject:** `{cons_sub}`")
+                    t_summary = []
+                    for it in items:
+                        t_no_str = str(it["ticket_no"]).strip()
+                        t_is_sent = "🔴 Sent" if t_no_str in sent_reminders_map else "🔵 Not Sent"
+                        t_summary.append({
+                            "Ticket Number": t_no_str,
+                            "Subject": it["subject"],
+                            "Department": it["department"],
+                            "Aging": f"{it['aging']} days",
+                            "Status": t_is_sent
+                        })
+                    st.dataframe(pd.DataFrame(t_summary), use_container_width=True, hide_index=True)
+                    st.markdown("**📧 Consolidated Email Body:**")
+                    st.code(cons_body, language="text")
+
+    # =========================================================================
+    # TAB 2: INDIVIDUAL TICKETS (ORIGINAL 1-BY-1 MODE)
+    # =========================================================================
+    with tab_single_rem:
+        # Bulk Action Bar for Single Tickets
+        rcol1, rcol2, rcol3 = st.columns([2, 1, 1])
+        with rcol1:
+            st.markdown(f"**Tickets in view:** `{len(reminder_list)}` | **Emails Matched:** `{matched_count}` | **Already Sent:** `{sum(1 for it in reminder_list if str(it['ticket_no']).strip() in sent_reminders_map)}`")
+        with rcol2:
+            send_all_btn = st.button("🚀 Send All Reminders (Single Click)", type="primary", use_container_width=True, key="btn_send_all_reminders")
+        with rcol3:
+            show_preview = st.checkbox("Show Email Cards", value=True, key="chk_show_reminder_preview")
+
+        # Handle Send All Click (via SMTP background)
+        if send_all_btn:
+            if not reminder_list:
+                st.info("No tickets in current view to send reminders for.")
+            elif not cfg_smtp_password:
+                st.warning(
+                    f"🔑 **SMTP Password Needed for Bulk Background Sending**\n\n"
+                    f"To send emails automatically in the background from `{cfg_sender_email}`, please expand **'⚙️ Sender & Email Settings'** above and enter your email/app password.\n\n"
+                    f"💡 **Immediate Alternative**: Click the **'✉️ Send via Outlook'** button next to each ticket below to open it pre-filled and log it with 1 click!"
                 )
+            else:
+                with st.spinner(f"Sending reminders from {cfg_sender_email}..."):
+                    sent_success = 0
+                    sent_failed = 0
+                    error_msgs = []
+                    progress_bar = st.progress(0)
+                    
+                    for idx, item in enumerate(reminder_list):
+                        recipient = item["matched_email"]
+                        if recipient:
+                            ok, msg = send_smtp_email(
+                                smtp_host=cfg_smtp_host,
+                                smtp_port=int(cfg_smtp_port),
+                                sender_email=cfg_sender_email,
+                                sender_password=cfg_smtp_password,
+                                recipient_email=recipient,
+                                subject=item["email_subject"],
+                                body=item["email_body"]
+                            )
+                            if ok:
+                                sent_success += 1
+                                record_sent_reminder(
+                                    ticket_number=item["ticket_no"],
+                                    creator_name=item["creator"],
+                                    recipient_email=recipient,
+                                    subject=item["email_subject"],
+                                    sent_by=cfg_sender_email,
+                                    delivery_mode="SMTP"
+                                )
+                            else:
+                                sent_failed += 1
+                                error_msgs.append(f"{item['ticket_no']} ({recipient}): {msg}")
+                        else:
+                            sent_failed += 1
+                            error_msgs.append(f"{item['ticket_no']} ({item['creator']}): No email address found")
+                        
+                        progress_bar.progress((idx + 1) / len(reminder_list))
+                    
+                    # Refresh map after bulk send
+                    sent_reminders_map = get_sent_reminders_map()
+                    
+                    if sent_success > 0:
+                        st.success(f"🎉 **Completed**: Successfully sent & logged {sent_success} reminder emails to SQLite!")
+                    if sent_failed > 0:
+                        st.error(f"⚠️ {sent_failed} email(s) could not be sent:")
+                        for err in error_msgs[:5]:
+                            st.caption(f"- {err}")
+
+        # Reminder Cards / Direct Outlook buttons (Individual Tickets)
+        if show_preview and reminder_list:
+            for item in reminder_list:
+                t_num = str(item["ticket_no"]).strip()
+                creator = item["creator"]
+                matched_addr = item["matched_email"]
+                t_subj = item["subject"]
+                aging = item["aging"]
+                mailto_link = item["mailto_url"]
+                
+                # Check sent status in SQLite
+                is_sent = t_num in sent_reminders_map
+                sent_info = sent_reminders_map.get(t_num)
+                
+                # Card style: Red if sent, Light Blue if not sent
+                card_class = "reminder-card-sent" if is_sent else "reminder-card-not-sent"
+                status_badge = (
+                    f'<span class="reminder-badge-sent">🔴 Sent ({sent_info["sent_at"][:16] if sent_info else "Yes"})</span>' 
+                    if is_sent 
+                    else '<span class="reminder-badge-not-sent">🔵 Not Sent</span>'
+                )
+                email_badge = f'<span class="reminder-email-tag">✉️ {matched_addr}</span>' if matched_addr else '<span class="reminder-email-missing">⚠️ Email not found in directory</span>'
+                
+                c_left, c_right = st.columns([3.6, 1.6])
+                with c_left:
+                    st.markdown(f"""
+                    <div class="{card_class}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                            <strong>🎫 {t_num}</strong> — {t_subj}
+                            {status_badge}
+                        </div>
+                        <div style="font-size: 0.85rem; color: #475569; margin-top: 0.2rem;">
+                            👤 Creator: <strong>{creator}</strong> {email_badge} • ⏱️ {aging} days
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with c_right:
+                    if mailto_link:
+                        outlook_btn_cls = "reminder-outlook-link-resend" if is_sent else "reminder-outlook-link"
+                        outlook_btn_txt = "✉️ Re-open in Outlook" if is_sent else "✉️ Open in Outlook"
+                        
+                        st.markdown(f"""
+                        <div style="margin-top: 0.2rem; margin-bottom: 0.4rem;">
+                            <a href="{mailto_link}" class="{outlook_btn_cls}" style="width: 100%; justify-content: center; box-sizing: border-box;">
+                                {outlook_btn_txt}
+                            </a>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        # Manual status toggle button: saves to SQLite and turns card Red (or toggles back)
+                        if not is_sent:
+                            if st.button("✅ Mark as Sent", key=f"btn_mark_sent_{t_num}", type="primary", use_container_width=True, help="Click once you send the email in Outlook to turn this card red and log to SQLite"):
+                                record_sent_reminder(
+                                    ticket_number=t_num,
+                                    creator_name=creator,
+                                    recipient_email=matched_addr or "",
+                                    subject=item["email_subject"],
+                                    sent_by=cfg_sender_email,
+                                    delivery_mode="Outlook"
+                                )
+                                st.toast(f"✅ Marked Ticket #{t_num} as Sent in SQLite!", icon="🔴")
+                                st.rerun()
+                        else:
+                            if st.button("↩️ Undo Sent", key=f"btn_undo_sent_{t_num}", type="secondary", use_container_width=True, help="Reset status back to light blue (Not Sent)"):
+                                remove_sent_reminder(t_num)
+                                st.toast(f"Reset Ticket #{t_num} to Not Sent.", icon="🔵")
+                                st.rerun()
+                    else:
+                        st.caption("No email mapped")
+
+                raw_ticket = item.get("raw_row")
+                ticket_desc = str(raw_ticket.get("Description", "")).strip() if raw_ticket is not None else ""
+                ticket_owner = str(item.get("owner") or (raw_ticket.get("Ticket Owner", "Unassigned") if raw_ticket is not None else "Unassigned")).strip()
+                customer_name = str(raw_ticket.get("Customer Name", "—")).strip() if raw_ticket is not None else "—"
+                start_date_val = str(raw_ticket.get("Start Date", "—")).strip() if raw_ticket is not None else "—"
+                req_date_val = str(raw_ticket.get("Required Date", "—")).strip() if raw_ticket is not None else "—"
+                est_date_val = str(raw_ticket.get("Estimate Resolution Date", "—")).strip() if raw_ticket is not None else "—"
+                priority_val = str(raw_ticket.get("Ticket Priority", "Normal")).strip() if raw_ticket is not None else "Normal"
+                dept_val = str(raw_ticket.get("Ticket Department", "Support")).strip() if raw_ticket is not None else "Support"
+                # Button to trigger the Modal Dialog Popup (Floating above UI in center)
+                if st.button(
+                    f"💬 View Conversation & Description for {t_num} ({creator})",
+                    key=f"btn_desc_modal_{t_num}",
+                    use_container_width=True,
+                    help="Click to open full ticket description and conversation in a centered popup modal"
+                ):
+                    show_ticket_description_dialog(
+                        t_num=t_num,
+                        creator=creator,
+                        matched_addr=matched_addr,
+                        t_subj=t_subj,
+                        aging=aging,
+                        ticket_owner=ticket_owner,
+                        customer_name=customer_name,
+                        start_date_val=start_date_val,
+                        req_date_val=req_date_val,
+                        est_date_val=est_date_val,
+                        priority_val=priority_val,
+                        dept_val=dept_val,
+                        ticket_desc=ticket_desc,
+                        email_subject=item.get("email_subject", ""),
+                        email_body=item.get("email_body", ""),
+                        mailto_url=mailto_link,
+                        is_sent=is_sent,
+                        cfg_sender_email=cfg_sender_email
+                    )
 
 
 

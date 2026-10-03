@@ -147,6 +147,88 @@ def generate_reminder_email(
     return email_subject, email_body
 
 
+def generate_consolidated_creator_reminder(
+    creator_name: str,
+    ticket_items: List[Any],
+    sender_name: str = "Sandeep Yadav",
+    company_name: str = "United Tyrekrafts Pvt. Ltd.",
+    sender_email: str = "sandeep.yadav@unitread.co.in",
+    sender_phone: str = "9682548514",
+    *args: Any,
+    **kwargs: Any
+) -> Tuple[str, str]:
+    """
+    Generate subject and consolidated body for an email to a ticket creator 
+    who has one or multiple tickets in 'Awaiting User Info'.
+    """
+    phone = kwargs.get("sender_phone", sender_phone)
+    if args and len(args) > 0 and isinstance(args[0], str):
+        phone = args[0]
+
+    c_clean = str(creator_name).strip() if creator_name else "User"
+    ticket_count = len(ticket_items)
+
+    if ticket_count <= 1:
+        if ticket_items:
+            first_item = ticket_items[0]
+            t_num = str(first_item.get("Ticket Number", "") if hasattr(first_item, "get") else getattr(first_item, "ticket_no", "")).strip()
+            t_subj = str(first_item.get("Subject", "") if hasattr(first_item, "get") else getattr(first_item, "subject", "")).strip()
+            email_subject = f"Follow-up: Ticket #{t_num} - {t_subj}"
+        else:
+            email_subject = f"Follow-up: Support Ticket Information - {company_name}"
+    else:
+        email_subject = f"Follow-up: Pending Information on Your {ticket_count} Support Tickets - {company_name}"
+
+    ticket_lines = []
+    for idx, item in enumerate(ticket_items, 1):
+        t_no = str(item.get("Ticket Number", "") if hasattr(item, "get") else getattr(item, "ticket_no", "")).strip()
+        subj = str(item.get("Subject", "") if hasattr(item, "get") else getattr(item, "subject", "")).strip()
+        dept = str(item.get("Ticket Department", "Support") if hasattr(item, "get") else getattr(item, "department", "Support")).strip()
+        start = str(item.get("Start Date", "N/A") if hasattr(item, "get") else getattr(item, "start_date", "N/A")).strip()
+        aging = item.get("Ticket Aging", 0) if hasattr(item, "get") else getattr(item, "aging", 0)
+
+        ticket_lines.append(
+            f"  {idx}. Ticket #{t_no}\n"
+            f"     • Subject: {subj}\n"
+            f"     • Department: {dept}\n"
+            f"     • Start Date: {start}\n"
+            f"     • Aging: {aging} days"
+        )
+
+    tickets_block = "\n\n".join(ticket_lines)
+
+    if ticket_count > 1:
+        header_intro = (
+            f"We are following up on your support tickets, which are currently marked 'Awaiting User Info'. "
+            f"You currently have {ticket_count} pending tickets waiting for your feedback:\n\n"
+            f"{tickets_block}\n\n"
+            f"Please reply to your tickets as soon as possible as we have to clear awaiting user info, so our support team can take the next steps:\n"
+            f"  1. If the problem has been RESOLVED, please confirm the ticket number(s) so we can close them.\n"
+            f"  2. If the problem is NOT SOLVED, please let us know your pending questions/issues so we can solve it for you immediately."
+        )
+    else:
+        header_intro = (
+            f"We are following up on your support ticket, which is currently marked 'Awaiting User Info':\n\n"
+            f"{tickets_block}\n\n"
+            f"Please reply to your ticket as soon as possible as we have to clear awaiting user info, so our support team can take the next steps:\n"
+            f"  1. If your problem has been RESOLVED, please confirm so we can close this ticket.\n"
+            f"  2. If the problem is NOT SOLVED, please let us know your pending questions/issues so we can solve it for you immediately."
+        )
+
+    email_body = (
+        f"Dear {c_clean},\n\n"
+        f"Hi, this is {sender_name} from {company_name}.\n\n"
+        f"{header_intro}\n\n"
+        f"Please reply to this on ticket as this has to be cleared. If any doubt, contact us on {phone}.\n\n"
+        f"Thank you,\n"
+        f"{sender_name}\n"
+        f"{company_name}\n"
+        f"Email: {sender_email}\n"
+    )
+
+    return email_subject, email_body
+
+
 def generate_mailto_url(recipient_email: str, subject: str, body: str) -> str:
     """Generate an encoded mailto: URL for one-click email client dispatch."""
     if not recipient_email:
