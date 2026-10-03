@@ -25,12 +25,48 @@ except ImportError:
 
 
 def get_api_key() -> Optional[str]:
-    """Retrieve OpenAI API key, falling back to reading .env directly if needed."""
+    """
+    Retrieve OpenAI API key across all possible environments:
+    1. Streamlit session_state (user input in UI)
+    2. Streamlit Cloud secrets (st.secrets["OPENAI_API_KEY"] or st.secrets["openai_api_key"])
+    3. os.environ["OPENAI_API_KEY"]
+    4. Local .env file
+    """
+    try:
+        import streamlit as st
+        # 1. Custom UI key input stored in session_state
+        custom_key = str(st.session_state.get("openai_api_key_custom", "")).strip()
+        if custom_key:
+            return custom_key
+
+        # 2. Streamlit Cloud Secrets
+        if hasattr(st, "secrets"):
+            if "OPENAI_API_KEY" in st.secrets:
+                sec_key = str(st.secrets["OPENAI_API_KEY"]).strip()
+                if sec_key:
+                    return sec_key
+            if "openai_api_key" in st.secrets:
+                sec_key = str(st.secrets["openai_api_key"]).strip()
+                if sec_key:
+                    return sec_key
+    except Exception:
+        pass
+
+    # 3. Process environment variables
     key = os.environ.get("OPENAI_API_KEY")
-    if not key:
+    if key and key.strip():
+        return key.strip()
+
+    # 4. Explicit .env file reading
+    try:
         load_dotenv(dotenv_path=ENV_PATH, override=True)
         key = os.environ.get("OPENAI_API_KEY")
-    return key
+        if key and key.strip():
+            return key.strip()
+    except Exception:
+        pass
+
+    return None
 
 
 def has_key_configured() -> bool:
@@ -188,12 +224,17 @@ def get_folder_upload_summary(folder_result: Dict[str, Any]) -> str:
 def draft_reply(row: pd.Series) -> str:
     """Ask OpenAI to draft a short follow-up asking the customer for the
     missing information needed to move this ticket forward."""
-    if OpenAI is None:
-        raise RuntimeError("OpenAI package is not installed. Please install it using `pip install openai`.")
-
     api_key = get_api_key()
-    if not api_key:
-        raise RuntimeError("No OpenAI API key configured in .env file.")
+    if not api_key or OpenAI is None:
+        ticket_no = row.get("Ticket Number", "")
+        subj = row.get("Subject", "")
+        cust = row.get("Customer Name", "Customer")
+        return (
+            f"Dear {cust},\n\n"
+            f"Hi, we are following up on your support ticket #{ticket_no} ('{subj}'), which is currently marked 'Awaiting User Info'.\n\n"
+            f"Please reply with the pending details or confirmation so our support team can proceed with resolution.\n\n"
+            f"Thank you,\nSupport Team"
+        )
 
     client: Any = OpenAI(api_key=api_key)
 
@@ -344,23 +385,83 @@ def generate_data_context(
     }
 
 
+def get_fallback_response(user_question: str, data_context: Dict[str, Any]) -> str:
+    """
+    Intelligent built-in data responder when OpenAI is not configured or unavailable.
+    Answers greetings, ticket searches, owner workload, aging metrics, and category summaries.
+    """
+    q_lower = user_question.strip().lower()
+    counts = data_context.get("counts", {})
+    total_active = sum(v for k, v in counts.items() if k not in ["Master", "Closed", "Mail To Analysis"])
+    
+    # 1. Greetings
+    if q_lower in ["hi", "hello", "hey", "hola", "namaste", "good morning", "good evening", "good afternoon", "start"]:
+        return (
+            "👋 **Hello! I'm your AI Ticket Assistant.**\n\n"
+            f"I have direct access to your uploaded ticket data! There are currently **{total_active} active tickets** in the workflow.\n\n"
+            "**Here are questions you can ask me right now:**\n"
+            "- *'What is the ticket count breakdown?'*\n"
+            "- *'Who has the most open tickets?'*\n"
+            "- *'Which tickets have highest aging?'*\n"
+            "- Or type any Ticket Number (e.g. `CT007607`) to look up its details!\n\n"
+            "💡 *Tip: To enable open-ended GPT-4o-mini conversational responses, add your `OPENAI_API_KEY` in Streamlit Secrets or in the API key field above.*"
+        )
+    
+    # 2. Check for specific ticket matches (e.g. searching a ticket number)
+    specific_matches = search_data_for_question(user_question, data_context)
+    if specific_matches:
+        return f"🔍 **Ticket Search Results**:\n{specific_matches}"
+        
+    # 3. Workload & Top Owners
+    if any(w in q_lower for w in ["owner", "workload", "who has", "most tickets", "assigned"]):
+        top_owners = data_context.get("top_owners", "No owner data available.")
+        return (
+            "👥 **Top Ticket Owner Workload**:\n\n"
+            f"{top_owners}\n\n"
+            f"**Priority Distribution**:\n{data_context.get('priority_summary', 'N/A')}"
+        )
+
+    # 4. Counts & Overview
+    if any(w in q_lower for w in ["breakdown", "count", "summary", "how many", "status", "overview", "total"]):
+        lines = [f"- **{k}**: `{v}` tickets" for k, v in counts.items()]
+        return (
+            "📊 **Ticket Flow Status Overview**:\n\n"
+            + "\n".join(lines) + "\n\n"
+            f"**Total Active (Non-Closed)**: `{total_active}` tickets\n\n"
+            f"**Top Workload**:\n{data_context.get('top_owners', 'N/A')}"
+        )
+
+    # 5. Aging
+    if any(w in q_lower for w in ["aging", "oldest", "delay", "days", "highest aging"]):
+        return (
+            "⏱️ **Ticket Aging Analysis**:\n\n"
+            f"{data_context.get('aging_summary', 'No aging data available.')}\n\n"
+            "👉 Use the **Awaiting User Info** tab to send 1-click reminders to creators to move older tickets forward!"
+        )
+
+    # 6. Default helpful response
+    return (
+        f"📋 **AI Ticket Assistant Summary**:\n\n"
+        f"You have **{total_active} active tickets** loaded.\n\n"
+        f"**Top Owners**:\n{data_context.get('top_owners', 'N/A')}\n\n"
+        "💡 *To ask arbitrary questions beyond these metrics, configure your `OPENAI_API_KEY` in Streamlit Cloud Secrets (or enter it in the key box above).* "
+        "Feel free to ask for *'summary'*, *'top owners'*, *'aging'*, or search for any ticket number!"
+    )
+
+
 def get_chatbot_response(
     user_question: str, 
     data_context: Dict[str, Any],
     history: Optional[List[Dict[str, str]]] = None
 ) -> str:
     """Get AI chatbot response for user questions about uploaded ticket Excel data."""
-    if OpenAI is None:
-        return "The OpenAI package is not installed. Please install `openai` to use the chatbot."
-
     api_key = get_api_key()
-    if not api_key:
-        return "No OpenAI API key configured in `.env` file. Please verify your OPENAI_API_KEY setting."
 
-    client: Any = OpenAI(api_key=api_key)
+    # If no OpenAI API key is configured or package missing, use the intelligent built-in data engine
+    if OpenAI is None or not api_key:
+        return get_fallback_response(user_question, data_context)
 
     specific_data_matches = search_data_for_question(user_question, data_context)
-
     counts_str = "\n".join([f"- {k}: {v} tickets" for k, v in data_context.get('counts', {}).items()])
     
     system_prompt = (
@@ -373,7 +474,7 @@ def get_chatbot_response(
         "PRIORITY DISTRIBUTION:\n"
         f"{data_context.get('priority_summary', 'N/A')}\n\n"
         "AGING METRICS:\n"
-        f"{data_context.get('aging_summary', 'N/A')}\n"
+        f"{data_context.get('aging_summary', 'N/A')}\n\n"
         f"{specific_data_matches}\n\n"
         "GUIDELINES:\n"
         "- Direct, concise, accurate answer based on the Excel file summary and matches above.\n"
@@ -391,6 +492,7 @@ def get_chatbot_response(
     messages.append({"role": "user", "content": user_question})
 
     try:
+        client: Any = OpenAI(api_key=api_key)
         response: Any = client.chat.completions.create(
             model="gpt-4o-mini",
             max_tokens=700,
@@ -400,6 +502,7 @@ def get_chatbot_response(
         content = response.choices[0].message.content
         return (content or "").strip()
     except Exception as e:
-        return f"I encountered an error analyzing your data: {str(e)}. Please check your OpenAI API key configuration."
+        fallback = get_fallback_response(user_question, data_context)
+        return f"{fallback}\n\n*(Note: Cloud AI encountered: {str(e)[:120]})*"
 
 

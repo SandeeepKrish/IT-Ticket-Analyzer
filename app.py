@@ -823,6 +823,21 @@ def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_d
             mail_to_df=mail_to_df
         )
 
+        # Optional OpenAI Key configuration expander
+        has_api = has_key_configured()
+        with st.expander("⚙️ OpenAI API Key (Optional — Smart built-in engine active)" if not has_api else "⚙️ OpenAI API Connected", expanded=False):
+            st.caption("The AI Assistant works automatically using its built-in smart analytics engine. You can also provide an OpenAI API key for advanced natural language reasoning.")
+            user_key_input = st.text_input(
+                "Enter OpenAI API Key (optional):",
+                value=st.session_state.get("openai_api_key_custom", ""),
+                type="password",
+                placeholder="sk-proj-...",
+                help="Your key is kept only in this session. In Streamlit Cloud, you can also set OPENAI_API_KEY in App Secrets."
+            )
+            if user_key_input != st.session_state.get("openai_api_key_custom", ""):
+                st.session_state["openai_api_key_custom"] = user_key_input
+                st.rerun()
+
         if "chatbot_messages" not in st.session_state:
             st.session_state["chatbot_messages"] = [
                 {
