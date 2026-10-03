@@ -52,6 +52,9 @@ from ai import (
     validate_folder_upload,
 )
 from footer import render_footer
+import importlib
+import mail_service
+importlib.reload(mail_service)
 from mail_service import (
     build_email_directory,
     find_creator_email,
@@ -1670,7 +1673,10 @@ with tab3:
     for _, r in wait_view.iterrows():
         creator_val = str(r.get("Ticket Creator", "")).strip()
         matched_email = find_creator_email(creator_val, email_directory)
-        sub_text, body_text = generate_reminder_email(r, cfg_sender_name, cfg_sender_company, cfg_sender_email, cfg_sender_phone)
+        try:
+            sub_text, body_text = generate_reminder_email(r, cfg_sender_name, cfg_sender_company, cfg_sender_email, cfg_sender_phone)
+        except TypeError:
+            sub_text, body_text = generate_reminder_email(r, cfg_sender_name, cfg_sender_company, cfg_sender_email)
         
         mailto_url = generate_mailto_url(matched_email, sub_text, body_text) if matched_email else ""
             

@@ -108,9 +108,15 @@ def generate_reminder_email(
     sender_name: str = "Sandeep Yadav", 
     company_name: str = "United Tyrekrafts Pvt. Ltd.", 
     sender_email: str = "utkerp@outlook.com",
-    sender_phone: str = "9682548514"
+    sender_phone: str = "9682548514",
+    *args: Any,
+    **kwargs: Any
 ) -> Tuple[str, str]:
     """Generate subject and professional body for reminder email to ticket creator."""
+    phone = kwargs.get("sender_phone", sender_phone)
+    if args and len(args) > 0 and isinstance(args[0], str):
+        phone = args[0]
+
     ticket_no = str(ticket_row.get("Ticket Number", "")).strip()
     subject_text = str(ticket_row.get("Subject", "")).strip()
     creator_name = str(ticket_row.get("Ticket Creator", "User")).strip()
@@ -132,7 +138,7 @@ def generate_reminder_email(
         f"Please reply to your ticket as soon as possible as we have to clear awaiting user info, so our support team can take the next steps:\n"
         f"  1. If your problem has been RESOLVED, please confirm so we can close this ticket.\n"
         f"  2. If the problem is NOT SOLVED, please let us know your pending questions/issues so we can solve it for you immediately.\n\n"
-        f"Please reply to this on ticket as this has to be cleared. If any doubt, contact us on {sender_phone}.\n\n"
+        f"Please reply to this on ticket as this has to be cleared. If any doubt, contact us on {phone}.\n\n"
         f"Thank you,\n"
         f"{sender_name}\n"
         f"{company_name}\n"
