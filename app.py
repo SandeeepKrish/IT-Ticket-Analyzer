@@ -61,6 +61,7 @@ from mail_service import (
     generate_consolidated_creator_reminder,
     generate_mailto_url,
     generate_reminder_email,
+    get_smtp_env_config,
     send_smtp_email,
 )
 from db_service import (
@@ -1726,17 +1727,18 @@ with tab3:
         st.warning("⚠️ **Mail Directory Not Loaded**: Please upload your **Mail To** file in the sidebar to auto-match each ticket creator's email address.")
 
     # Sender and Email Dispatch Settings
-    with st.expander("⚙️ Sender & Email Settings (Defaults: Sandeep Yadav | United Tyrekrafts)", expanded=False):
+    smtp_cfg = get_smtp_env_config()
+    with st.expander("⚙️ Sender & Email Settings (BlackBox / Corporate SMTP)", expanded=False):
         c_set1, c_set2 = st.columns(2)
         with c_set1:
-            cfg_sender_name = st.text_input("Sender Name", value="Sandeep Yadav", key="rem_sender_name")
-            cfg_sender_company = st.text_input("Company Name", value="United Tyrekrafts Pvt. Ltd.", key="rem_sender_company")
-            cfg_sender_email = st.text_input("Sender Email Address", value=os.environ.get("SENDER_EMAIL", "sandeep.yadav@unitread.co.in"), key="rem_sender_email")
-            cfg_sender_phone = st.text_input("Contact Phone Number", value=os.environ.get("SENDER_PHONE", "9682548514"), key="rem_sender_phone")
+            cfg_sender_name = st.text_input("Sender Name", value=smtp_cfg["sender_name"], key="rem_sender_name")
+            cfg_sender_company = st.text_input("Company Name", value=smtp_cfg["sender_company"], key="rem_sender_company")
+            cfg_sender_email = st.text_input("Sender Email Address", value=smtp_cfg["sender_email"], key="rem_sender_email")
+            cfg_sender_phone = st.text_input("Contact Phone Number", value=smtp_cfg["sender_phone"], key="rem_sender_phone")
         with c_set2:
-            cfg_smtp_host = st.text_input("SMTP Server (for direct 1-click background sending)", value=os.environ.get("SMTP_HOST", "smtp.office365.com"), key="rem_smtp_host")
-            cfg_smtp_port = st.number_input("SMTP Port", value=int(os.environ.get("SMTP_PORT", "587")), step=1, key="rem_smtp_port")
-            cfg_smtp_password = st.text_input("SMTP / App Password (Optional)", type="password", value=os.environ.get("SMTP_PASSWORD", ""), key="rem_smtp_password", help="Enter app password to send directly in background without opening Outlook")
+            cfg_smtp_host = st.text_input("SMTP Server (BlackBox / Corporate Host)", value=smtp_cfg["smtp_host"], key="rem_smtp_host")
+            cfg_smtp_port = st.number_input("SMTP Port", value=int(smtp_cfg["smtp_port"]), step=1, key="rem_smtp_port")
+            cfg_smtp_password = st.text_input("SMTP / App Password (Optional)", type="password", value=smtp_cfg["smtp_password"], key="rem_smtp_password", help="Enter BlackBox / corporate SMTP password for direct 1-click background bulk sending")
 
     # Match tickets with emails
     reminder_list: List[Dict[str, Any]] = []

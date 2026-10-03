@@ -12,8 +12,73 @@ import urllib.parse
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Dict, List, Optional, Tuple
+import os
 
 import pandas as pd
+
+
+def get_smtp_env_config() -> Dict[str, Any]:
+    """Retrieve SMTP & Sender configuration across Streamlit secrets and environment variables."""
+    cfg = {
+        "smtp_host": "smtp.office365.com",
+        "smtp_port": 587,
+        "smtp_password": "",
+        "use_tls": True,
+        "sender_email": "ttkerp@outlook.com",
+        "sender_name": "Sandeep Yadav",
+        "sender_company": "United Tyrekrafts Pvt. Ltd.",
+        "sender_phone": "9682548514",
+    }
+    
+    # 1. Check Streamlit Cloud Secrets (st.secrets)
+    try:
+        import streamlit as st
+        try:
+            sec = st.secrets
+            if sec is not None:
+                if "SMTP_HOST" in sec and sec["SMTP_HOST"]:
+                    cfg["smtp_host"] = str(sec["SMTP_HOST"]).strip()
+                if "SMTP_PORT" in sec and sec["SMTP_PORT"]:
+                    cfg["smtp_port"] = int(sec["SMTP_PORT"])
+                if "SMTP_PASSWORD" in sec and sec["SMTP_PASSWORD"]:
+                    cfg["smtp_password"] = str(sec["SMTP_PASSWORD"]).strip()
+                if "SMTP_USE_TLS" in sec and sec["SMTP_USE_TLS"] is not None:
+                    cfg["use_tls"] = bool(sec["SMTP_USE_TLS"])
+                if "SENDER_EMAIL" in sec and sec["SENDER_EMAIL"]:
+                    cfg["sender_email"] = str(sec["SENDER_EMAIL"]).strip()
+                if "SENDER_NAME" in sec and sec["SENDER_NAME"]:
+                    cfg["sender_name"] = str(sec["SENDER_NAME"]).strip()
+                if "COMPANY_NAME" in sec and sec["COMPANY_NAME"]:
+                    cfg["sender_company"] = str(sec["COMPANY_NAME"]).strip()
+                if "SENDER_PHONE" in sec and sec["SENDER_PHONE"]:
+                    cfg["sender_phone"] = str(sec["SENDER_PHONE"]).strip()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # 2. Check os.environ
+    if os.environ.get("SMTP_HOST"):
+        cfg["smtp_host"] = os.environ.get("SMTP_HOST", "").strip()
+    if os.environ.get("SMTP_PORT"):
+        try:
+            cfg["smtp_port"] = int(os.environ.get("SMTP_PORT", "587").strip())
+        except Exception:
+            pass
+    if os.environ.get("SMTP_PASSWORD"):
+        cfg["smtp_password"] = os.environ.get("SMTP_PASSWORD", "").strip()
+    if os.environ.get("SMTP_USE_TLS") is not None:
+        cfg["use_tls"] = os.environ.get("SMTP_USE_TLS", "").strip().lower() in ("true", "1", "yes")
+    if os.environ.get("SENDER_EMAIL"):
+        cfg["sender_email"] = os.environ.get("SENDER_EMAIL", "").strip()
+    if os.environ.get("SENDER_NAME"):
+        cfg["sender_name"] = os.environ.get("SENDER_NAME", "").strip()
+    if os.environ.get("COMPANY_NAME"):
+        cfg["sender_company"] = os.environ.get("COMPANY_NAME", "").strip()
+    if os.environ.get("SENDER_PHONE"):
+        cfg["sender_phone"] = os.environ.get("SENDER_PHONE", "").strip()
+    
+    return cfg
 
 
 def build_email_directory(mail_to_df: Optional[pd.DataFrame]) -> Dict[str, str]:
