@@ -27,42 +27,60 @@ except ImportError:
 def get_api_key() -> Optional[str]:
     """
     Retrieve OpenAI API key across all possible environments:
-    1. Streamlit session_state (user input in UI)
-    2. Streamlit Cloud secrets (st.secrets["OPENAI_API_KEY"] or st.secrets["openai_api_key"])
-    3. os.environ["OPENAI_API_KEY"]
+    1. Streamlit session_state (user input in UI: st.session_state["openai_api_key_custom"])
+    2. Streamlit Cloud secrets (st.secrets):
+       - st.secrets["OPENAI_API_KEY"]
+       - st.secrets["openai_api_key"]
+       - st.secrets["OPENAI_KEY"]
+       - st.secrets["openai"]["api_key"]
+    3. OS Environment variables (os.environ["OPENAI_API_KEY"])
     4. Local .env file
     """
+    # 1. Custom UI key input stored in session_state
     try:
         import streamlit as st
-        # 1. Custom UI key input stored in session_state
         custom_key = str(st.session_state.get("openai_api_key_custom", "")).strip()
         if custom_key:
             return custom_key
+    except Exception:
+        pass
 
-        # 2. Streamlit Cloud Secrets
-        if hasattr(st, "secrets"):
-            if "OPENAI_API_KEY" in st.secrets:
-                sec_key = str(st.secrets["OPENAI_API_KEY"]).strip()
-                if sec_key:
-                    return sec_key
-            if "openai_api_key" in st.secrets:
-                sec_key = str(st.secrets["openai_api_key"]).strip()
-                if sec_key:
-                    return sec_key
+    # 2. Streamlit Cloud Secrets
+    try:
+        import streamlit as st
+        try:
+            sec = st.secrets
+            if sec is not None:
+                # Direct keys
+                for k in ["OPENAI_API_KEY", "openai_api_key", "OPENAI_KEY", "openai_key", "OPEN_AI_KEY"]:
+                    if k in sec and sec[k]:
+                        val = str(sec[k]).strip()
+                        if val:
+                            return val
+                # Nested table e.g. [openai] api_key = "..."
+                if "openai" in sec and hasattr(sec["openai"], "get"):
+                    for k in ["api_key", "OPENAI_API_KEY", "openai_api_key", "key"]:
+                        val = str(sec["openai"].get(k, "")).strip()
+                        if val:
+                            return val
+        except Exception:
+            pass
     except Exception:
         pass
 
     # 3. Process environment variables
-    key = os.environ.get("OPENAI_API_KEY")
-    if key and key.strip():
-        return key.strip()
+    for env_k in ["OPENAI_API_KEY", "openai_api_key", "OPENAI_KEY", "OPEN_AI_KEY"]:
+        key = os.environ.get(env_k)
+        if key and key.strip():
+            return key.strip()
 
     # 4. Explicit .env file reading
     try:
         load_dotenv(dotenv_path=ENV_PATH, override=True)
-        key = os.environ.get("OPENAI_API_KEY")
-        if key and key.strip():
-            return key.strip()
+        for env_k in ["OPENAI_API_KEY", "openai_api_key", "OPENAI_KEY", "OPEN_AI_KEY"]:
+            key = os.environ.get(env_k)
+            if key and key.strip():
+                return key.strip()
     except Exception:
         pass
 
@@ -485,9 +503,12 @@ def get_chatbot_response(
     messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     
     if history:
-        for msg in history[-6:]:
-            if msg.get("role") in ("user", "assistant") and msg.get("content"):
-                messages.append({"role": msg["role"], "content": msg["content"]})
+        hist_msgs = [m for m in history if m.get("role") in ("user", "assistant") and m.get("content")]
+        # Drop the last message if it's already identical to user_question
+        if hist_msgs and hist_msgs[-1].get("role") == "user" and hist_msgs[-1].get("content") == user_question:
+            hist_msgs = hist_msgs[:-1]
+        for msg in hist_msgs[-6:]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
     
     messages.append({"role": "user", "content": user_question})
 

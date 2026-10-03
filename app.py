@@ -823,20 +823,43 @@ def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_d
             mail_to_df=mail_to_df
         )
 
-        # Optional OpenAI Key configuration expander
+        # OpenAI Key configuration & Status
         has_api = has_key_configured()
-        with st.expander("⚙️ OpenAI API Key (Optional — Smart built-in engine active)" if not has_api else "⚙️ OpenAI API Connected", expanded=False):
-            st.caption("The AI Assistant works automatically using its built-in smart analytics engine. You can also provide an OpenAI API key for advanced natural language reasoning.")
-            user_key_input = st.text_input(
-                "Enter OpenAI API Key (optional):",
-                value=st.session_state.get("openai_api_key_custom", ""),
-                type="password",
-                placeholder="sk-proj-...",
-                help="Your key is kept only in this session. In Streamlit Cloud, you can also set OPENAI_API_KEY in App Secrets."
-            )
-            if user_key_input != st.session_state.get("openai_api_key_custom", ""):
-                st.session_state["openai_api_key_custom"] = user_key_input
-                st.rerun()
+        expander_title = "🟢 OpenAI GPT-4o-mini Active" if has_api else "⚙️ OpenAI API Configuration (Production Setup)"
+        with st.expander(expander_title, expanded=False):
+            if has_api:
+                st.success("✅ **OpenAI API Key is connected!** Chatbot will use GPT-4o-mini with full contextual reasoning.")
+            else:
+                st.info("ℹ️ **Built-in Smart Data Engine is currently active.** Basic greetings, breakdowns, owners, aging, and ticket search work without any key.")
+            
+            c_key1, c_key2 = st.columns([3, 1])
+            with c_key1:
+                user_key_input = st.text_input(
+                    "OpenAI API Key (Session / Production):",
+                    value=st.session_state.get("openai_api_key_custom", ""),
+                    type="password",
+                    key="chat_openai_key_input",
+                    placeholder="sk-proj-...",
+                    help="Paste your key here to activate GPT-4o-mini immediately for this browser session."
+                )
+            with c_key2:
+                st.write("")
+                st.write("")
+                if st.button("💾 Apply Key", key="btn_apply_chat_key", use_container_width=True):
+                    st.session_state["openai_api_key_custom"] = user_key_input.strip()
+                    st.rerun()
+
+            st.markdown("""
+            ---
+            **📌 How to permanently configure in Streamlit Community Cloud (Production):**
+            1. Open your app on [share.streamlit.io](https://share.streamlit.io).
+            2. Click the **Settings (⋮)** button in the bottom/top corner and select **Secrets**.
+            3. Paste the following line:
+            ```toml
+            OPENAI_API_KEY = "sk-proj-your-api-key-here"
+            ```
+            4. Click **Save**. Your deployed app will now permanently use OpenAI without needing to paste the key!
+            """)
 
         if "chatbot_messages" not in st.session_state:
             st.session_state["chatbot_messages"] = [
@@ -909,6 +932,29 @@ with st.sidebar:
         if st.button("❌ Clear Loaded Data", key="btn_clear_loaded", use_container_width=True):
             clear_loaded_session_data()
             st.rerun()
+
+    st.divider()
+
+    # ============ AI ASSISTANT CONFIG ============
+    with st.expander("🤖 AI Chatbot Settings", expanded=False):
+        sb_has_api = has_key_configured()
+        if sb_has_api:
+            st.success("🟢 OpenAI GPT Connected")
+        else:
+            st.info("🟡 Built-in Engine Active")
+        
+        sb_key_val = st.text_input(
+            "OpenAI API Key (Session)",
+            value=st.session_state.get("openai_api_key_custom", ""),
+            type="password",
+            placeholder="sk-proj-...",
+            key="sb_key_input",
+            help="Set your OpenAI key for this session."
+        )
+        if st.button("Apply Key", key="btn_save_sb_key", use_container_width=True):
+            st.session_state["openai_api_key_custom"] = sb_key_val.strip()
+            st.rerun()
+        st.caption("Tip: Add `OPENAI_API_KEY` to Streamlit Cloud Secrets for permanent production access.")
 
     st.divider()
 
