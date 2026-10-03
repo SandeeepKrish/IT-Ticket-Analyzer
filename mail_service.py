@@ -107,7 +107,7 @@ def generate_reminder_email(
     ticket_row: pd.Series, 
     sender_name: str = "Sandeep Yadav", 
     company_name: str = "United Tyrekrafts Pvt. Ltd.", 
-    sender_email: str = "utkerp@outlook.com",
+    sender_email: str = "sandeep.yadav@unitread.co.in",
     sender_phone: str = "9682548514",
     *args: Any,
     **kwargs: Any

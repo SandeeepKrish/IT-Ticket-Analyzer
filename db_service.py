@@ -77,7 +77,7 @@ def record_sent_reminder(
     creator_name: str,
     recipient_email: str,
     subject: str,
-    sent_by: str = "utkerp@outlook.com",
+    sent_by: str = "sandeep.yadav@unitread.co.in",
     delivery_mode: str = "Outlook",
     db_path: str = DB_PATH
 ) -> bool:
