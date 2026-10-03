@@ -81,7 +81,7 @@ def find_creator_email(creator_name: str, directory: Dict[str, str]) -> Optional
     if not creator_name or not directory:
         return None
         
-    c_clean = str(creator_name).strip()
+    c_clean = creator_name.strip()
     if c_clean in directory:
         return directory[c_clean]
     if c_clean.lower() in directory:
@@ -165,7 +165,7 @@ def generate_consolidated_creator_reminder(
     if args and len(args) > 0 and isinstance(args[0], str):
         phone = args[0]
 
-    c_clean = str(creator_name).strip() if creator_name else "User"
+    c_clean = creator_name.strip() if creator_name else "User"
     ticket_count = len(ticket_items)
 
     if ticket_count <= 1:
