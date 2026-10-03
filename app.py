@@ -1555,50 +1555,58 @@ with tab0:
 
 with tab1:
     # Filters for Work in Progress
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(wip_df["Ticket Owner"].dropna().unique().tolist())
         wip_owner_filter = st.selectbox("WIP Owner", owners, key="wip_owner_filter", label_visibility="collapsed")
     with col2:
+        st.markdown('<div class="filter-label">Filter by Creator</div>', unsafe_allow_html=True)
+        wip_creators = ["All creators"] + (sorted(wip_df["Ticket Creator"].dropna().unique().tolist()) if "Ticket Creator" in wip_df.columns else [])
+        wip_creator_filter = st.selectbox("WIP Creator", wip_creators, key="wip_creator_filter", label_visibility="collapsed")
+    with col3:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
         wip_year_filter = st.selectbox("WIP Year", available_years, key="wip_year_filter", label_visibility="collapsed")
-    with col3:
+    with col4:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
         wip_month_filter = st.selectbox("WIP Month", available_months, key="wip_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
-    display_filter_results(wip_df, "Work in Progress", wip_owner_filter, wip_year_filter, wip_month_filter, "#007bff")
+    display_filter_results(wip_df, "Work in Progress", wip_owner_filter, wip_year_filter, wip_month_filter, "#007bff", creator_filter=wip_creator_filter)
     
     # Display user statistics if specific owner is selected
     display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, wip_owner_filter, wip_year_filter, wip_month_filter)
     
     # Filter and display data
-    wip_view = get_filtered_data(wip_df, wip_owner_filter, wip_year_filter, wip_month_filter)
+    wip_view = get_filtered_data(wip_df, wip_owner_filter, wip_year_filter, wip_month_filter, creator_filter=wip_creator_filter)
     st.dataframe(wip_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 with tab2:
     # Filters for Under Development
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(dev_df["Ticket Owner"].dropna().unique().tolist())
         dev_owner_filter = st.selectbox("Dev Owner", owners, key="dev_owner_filter", label_visibility="collapsed")
     with col2:
+        st.markdown('<div class="filter-label">Filter by Creator</div>', unsafe_allow_html=True)
+        dev_creators = ["All creators"] + (sorted(dev_df["Ticket Creator"].dropna().unique().tolist()) if "Ticket Creator" in dev_df.columns else [])
+        dev_creator_filter = st.selectbox("Dev Creator", dev_creators, key="dev_creator_filter", label_visibility="collapsed")
+    with col3:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
         dev_year_filter = st.selectbox("Dev Year", available_years, key="dev_year_filter", label_visibility="collapsed")
-    with col3:
+    with col4:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
         dev_month_filter = st.selectbox("Dev Month", available_months, key="dev_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
-    display_filter_results(dev_df, "Under Development", dev_owner_filter, dev_year_filter, dev_month_filter, "#fd7e14")
+    display_filter_results(dev_df, "Under Development", dev_owner_filter, dev_year_filter, dev_month_filter, "#fd7e14", creator_filter=dev_creator_filter)
     
     # Display user statistics if specific owner is selected
     display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, dev_owner_filter, dev_year_filter, dev_month_filter)
     
     # Filter and display data
-    dev_view = get_filtered_data(dev_df, dev_owner_filter, dev_year_filter, dev_month_filter)
+    dev_view = get_filtered_data(dev_df, dev_owner_filter, dev_year_filter, dev_month_filter, creator_filter=dev_creator_filter)
     st.dataframe(dev_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 with tab3:
@@ -2203,98 +2211,114 @@ with tab3:
 
 with tab4:
     # Filters for Hold
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(hold_df["Ticket Owner"].dropna().unique().tolist())
         hold_owner_filter = st.selectbox("Hold Owner", owners, key="hold_owner_filter", label_visibility="collapsed")
     with col2:
+        st.markdown('<div class="filter-label">Filter by Creator</div>', unsafe_allow_html=True)
+        hold_creators = ["All creators"] + (sorted(hold_df["Ticket Creator"].dropna().unique().tolist()) if "Ticket Creator" in hold_df.columns else [])
+        hold_creator_filter = st.selectbox("Hold Creator", hold_creators, key="hold_creator_filter", label_visibility="collapsed")
+    with col3:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
         hold_year_filter = st.selectbox("Hold Year", available_years, key="hold_year_filter", label_visibility="collapsed")
-    with col3:
+    with col4:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
         hold_month_filter = st.selectbox("Hold Month", available_months, key="hold_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
-    display_filter_results(hold_df, "Hold", hold_owner_filter, hold_year_filter, hold_month_filter, "#6f42c1")
+    display_filter_results(hold_df, "Hold", hold_owner_filter, hold_year_filter, hold_month_filter, "#6f42c1", creator_filter=hold_creator_filter)
     
     # Display user statistics if specific owner is selected
     display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, hold_owner_filter, hold_year_filter, hold_month_filter)
     
     # Filter and display data
-    hold_view = get_filtered_data(hold_df, hold_owner_filter, hold_year_filter, hold_month_filter)
+    hold_view = get_filtered_data(hold_df, hold_owner_filter, hold_year_filter, hold_month_filter, creator_filter=hold_creator_filter)
     st.dataframe(hold_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 with tab5:
     # Filters for Open
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(open_df["Ticket Owner"].dropna().unique().tolist())
         open_owner_filter = st.selectbox("Open Owner", owners, key="open_owner_filter", label_visibility="collapsed")
     with col2:
+        st.markdown('<div class="filter-label">Filter by Creator</div>', unsafe_allow_html=True)
+        open_creators = ["All creators"] + (sorted(open_df["Ticket Creator"].dropna().unique().tolist()) if "Ticket Creator" in open_df.columns else [])
+        open_creator_filter = st.selectbox("Open Creator", open_creators, key="open_creator_filter", label_visibility="collapsed")
+    with col3:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
         open_year_filter = st.selectbox("Open Year", available_years, key="open_year_filter", label_visibility="collapsed")
-    with col3:
+    with col4:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
         open_month_filter = st.selectbox("Open Month", available_months, key="open_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
-    display_filter_results(open_df, "Open", open_owner_filter, open_year_filter, open_month_filter, "#28a745")
+    display_filter_results(open_df, "Open", open_owner_filter, open_year_filter, open_month_filter, "#28a745", creator_filter=open_creator_filter)
     
     # Display user statistics if specific owner is selected
     display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, open_owner_filter, open_year_filter, open_month_filter)
     
     # Filter and display data
-    open_view = get_filtered_data(open_df, open_owner_filter, open_year_filter, open_month_filter)
+    open_view = get_filtered_data(open_df, open_owner_filter, open_year_filter, open_month_filter, creator_filter=open_creator_filter)
     st.dataframe(open_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 with tab6:
     # Filters for Pending
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(pending_df["Ticket Owner"].dropna().unique().tolist())
         pending_owner_filter = st.selectbox("Pending Owner", owners, key="pending_owner_filter", label_visibility="collapsed")
     with col2:
+        st.markdown('<div class="filter-label">Filter by Creator</div>', unsafe_allow_html=True)
+        pending_creators = ["All creators"] + (sorted(pending_df["Ticket Creator"].dropna().unique().tolist()) if "Ticket Creator" in pending_df.columns else [])
+        pending_creator_filter = st.selectbox("Pending Creator", pending_creators, key="pending_creator_filter", label_visibility="collapsed")
+    with col3:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
         pending_year_filter = st.selectbox("Pending Year", available_years, key="pending_year_filter", label_visibility="collapsed")
-    with col3:
+    with col4:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
         pending_month_filter = st.selectbox("Pending Month", available_months, key="pending_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
-    display_filter_results(pending_df, "Pending", pending_owner_filter, pending_year_filter, pending_month_filter, "#ffc107")
+    display_filter_results(pending_df, "Pending", pending_owner_filter, pending_year_filter, pending_month_filter, "#ffc107", creator_filter=pending_creator_filter)
     
     # Display user statistics if specific owner is selected
     display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, pending_owner_filter, pending_year_filter, pending_month_filter)
     
     # Filter and display data
-    pending_view = get_filtered_data(pending_df, pending_owner_filter, pending_year_filter, pending_month_filter)
+    pending_view = get_filtered_data(pending_df, pending_owner_filter, pending_year_filter, pending_month_filter, creator_filter=pending_creator_filter)
     st.dataframe(pending_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 with tab7:
     # Filters for Closed
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
         owners = ["All owners"] + sorted(closed_df["Ticket Owner"].dropna().unique().tolist())
         closed_owner_filter = st.selectbox("Closed Owner", owners, key="closed_owner_filter", label_visibility="collapsed")
     with col2:
+        st.markdown('<div class="filter-label">Filter by Creator</div>', unsafe_allow_html=True)
+        closed_creators = ["All creators"] + (sorted(closed_df["Ticket Creator"].dropna().unique().tolist()) if "Ticket Creator" in closed_df.columns else [])
+        closed_creator_filter = st.selectbox("Closed Creator", closed_creators, key="closed_creator_filter", label_visibility="collapsed")
+    with col3:
         st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
         closed_year_filter = st.selectbox("Closed Year", available_years, key="closed_year_filter", label_visibility="collapsed")
-    with col3:
+    with col4:
         st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
         closed_month_filter = st.selectbox("Closed Month", available_months, key="closed_month_filter", label_visibility="collapsed")
     
     # Display prominent filter results
-    display_filter_results(closed_df, "Closed", closed_owner_filter, closed_year_filter, closed_month_filter, "#6c757d")
+    display_filter_results(closed_df, "Closed", closed_owner_filter, closed_year_filter, closed_month_filter, "#6c757d", creator_filter=closed_creator_filter)
     
     # Display user statistics if specific owner is selected
     display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, closed_owner_filter, closed_year_filter, closed_month_filter)
     
     # Filter and display data
-    closed_view = get_filtered_data(closed_df, closed_owner_filter, closed_year_filter, closed_month_filter)
+    closed_view = get_filtered_data(closed_df, closed_owner_filter, closed_year_filter, closed_month_filter, creator_filter=closed_creator_filter)
     st.dataframe(closed_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 # ---------------------------------------------------------------- AI Assistant & Footer
