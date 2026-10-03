@@ -20,11 +20,11 @@ import pandas as pd
 def get_smtp_env_config() -> Dict[str, Any]:
     """Retrieve SMTP & Sender configuration across Streamlit secrets and environment variables."""
     cfg = {
-        "smtp_host": "smtp.office365.com",
-        "smtp_port": 587,
-        "smtp_password": "",
-        "use_tls": True,
-        "sender_email": "ttkerp@outlook.com",
+        "smtp_host": "smtp.blackbox.in",
+        "smtp_port": 465,
+        "smtp_password": "Xm7#Tc*1o6",
+        "use_tls": False,
+        "sender_email": "sandeep.yadav@unitread.co.in",
         "sender_name": "Sandeep Yadav",
         "sender_company": "United Tyrekrafts Pvt. Ltd.",
         "sender_phone": "9682548514",
@@ -322,7 +322,11 @@ def send_smtp_email(
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
         
         if smtp_port == 465:
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+            import ssl
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ssl_ctx, timeout=15) as server:
                 server.login(sender_email, sender_password)
                 server.send_message(msg)
         else:
