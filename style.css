@@ -1055,8 +1055,35 @@ header {
     white-space: pre-wrap;
 }
 
+/* Modal Dialog Box Styles (Floating above main UI in center) */
+div[role="dialog"] {
+    border-radius: 12px !important;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35) !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 1.25rem 1.5rem !important;
+    max-width: 900px !important;
+}
 
+div[role="dialog"] header h2 {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+}
 
+.dialog-raw-desc-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.9rem 1.1rem;
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 0.88rem;
+    color: #334155;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    font-family: inherit;
+    margin: 0.5rem 0;
+}
 
 /* =====================================================
    SQLite Database & Demo Data Mode Styles

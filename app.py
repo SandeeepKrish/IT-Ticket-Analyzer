@@ -587,6 +587,118 @@ def validate_columns(df: pd.DataFrame, label: str) -> bool:
     return True
 
 
+@st.dialog("🎫 Ticket Description & Conversation Thread", width="large")
+def show_ticket_description_dialog(
+    t_num: str,
+    creator: str,
+    matched_addr: str,
+    t_subj: str,
+    aging: int,
+    ticket_owner: str,
+    customer_name: str,
+    start_date_val: str,
+    req_date_val: str,
+    est_date_val: str,
+    priority_val: str,
+    dept_val: str,
+    ticket_desc: str,
+    email_subject: str = "",
+    email_body: str = "",
+    mailto_url: str = "",
+    is_sent: bool = False,
+    cfg_sender_email: str = ""
+):
+    """Opens a centered modal dialog box floating above the main UI showing ticket description & conversation."""
+    st.markdown(f"### 🎫 Ticket #{t_num}: {t_subj}")
+    
+    # Metadata Overview Callout Banner
+    st.markdown(f"""
+    <div style="background: #f8fafc; border-left: 4px solid #0284c7; border-radius: 8px; padding: 0.85rem 1.1rem; margin: 0.4rem 0 0.9rem 0; border: 1px solid #e2e8f0; border-left-width: 4px;">
+        <div style="font-size: 0.92rem; color: #0f172a; margin-bottom: 0.35rem;">
+            👨‍💻 <strong>Ticket Owner / Respondent:</strong> <span style="color: #1d4ed8; font-weight: 700;">{ticket_owner}</span> <span style="color: #64748b;">({dept_val})</span>
+            &nbsp;&nbsp;•&nbsp;&nbsp;
+            👤 <strong>Created By:</strong> <span style="color: #0369a1; font-weight: 600;">{creator}</span> <span style="color: #64748b;">({matched_addr or 'No email'})</span>
+        </div>
+        <div style="font-size: 0.82rem; color: #475569; display: flex; flex-wrap: wrap; gap: 0.85rem; margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px dashed #cbd5e1;">
+            <span>🏢 Customer: <strong>{customer_name}</strong></span>
+            <span>⚡ Priority: <strong>{priority_val}</strong></span>
+            <span>📅 Opened: <strong>{start_date_val}</strong></span>
+            <span>🎯 Est. Resolution: <strong>{est_date_val}</strong></span>
+            <span>⏱️ Aging: <strong>{aging} days</strong></span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Ticket Description & Conversation Thread
+    st.markdown("#### 📝 Ticket Description & Conversation Thread")
+    if ticket_desc and ticket_desc not in ("nan", "None", ""):
+        desc_paragraphs = [p.strip() for p in ticket_desc.split("\n") if p.strip()]
+        initial_msg = desc_paragraphs[0] if desc_paragraphs else ticket_desc
+        
+        st.markdown(f"""
+        <div class="conversation-box">
+            <div class="conversation-bubble conversation-bubble-user">
+                <div class="conversation-sender conversation-sender-user">
+                    <span>👤 Initial Inquiry by {creator}</span>
+                    <span class="conversation-time">📅 Opened: {start_date_val}</span>
+                </div>
+                <div class="conversation-text">{initial_msg}</div>
+            </div>
+            <div class="conversation-bubble conversation-bubble-support">
+                <div class="conversation-sender conversation-sender-support">
+                    <span>👨‍💻 Last Reply / Investigation by Ticket Owner: <strong>{ticket_owner}</strong></span>
+                    <span class="conversation-time">⏱️ Status: Awaiting User Info ({aging} days)</span>
+                </div>
+                <div class="conversation-text"><strong>Latest Status Update:</strong> Ticket investigated by {ticket_owner}. Currently waiting on user clarification or confirmation from {creator} to proceed with resolution.</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if len(desc_paragraphs) > 1:
+            st.markdown("##### 📋 Complete Raw Description")
+            st.markdown(f"""
+            <div class="dialog-raw-desc-box">{ticket_desc}</div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info(f"No specific description text was attached to ticket #{t_num} in the uploaded Excel file.")
+
+    # Outgoing Follow-Up Reminder Draft
+    if email_subject or email_body:
+        st.markdown("#### ✉️ Outgoing Follow-Up Reminder Draft")
+        st.text_input("Subject", email_subject, key=f"dlg_subj_{t_num}", disabled=True)
+        st.text_area("Body", email_body, key=f"dlg_body_{t_num}", height=140, disabled=True)
+        
+    st.markdown("<hr style='margin: 1rem 0 0.8rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+    
+    # Bottom Action Bar
+    col_act1, col_act2, col_close = st.columns([1.6, 1.6, 1])
+    with col_act1:
+        if mailto_url:
+            st.link_button("✉️ Open in Outlook", mailto_url, use_container_width=True)
+    with col_act2:
+        if email_subject and cfg_sender_email:
+            if not is_sent:
+                if st.button("✅ Mark as Sent", key=f"dlg_mark_{t_num}", type="primary", use_container_width=True):
+                    record_sent_reminder(
+                        ticket_number=t_num,
+                        creator_name=creator,
+                        recipient_email=matched_addr or "",
+                        subject=email_subject,
+                        sent_by=cfg_sender_email,
+                        delivery_mode="Outlook"
+                    )
+                    st.toast(f"✅ Marked Ticket #{t_num} as Sent in SQLite!", icon="🔴")
+                    st.rerun()
+            else:
+                if st.button("↩️ Undo Sent", key=f"dlg_undo_{t_num}", type="secondary", use_container_width=True):
+                    remove_sent_reminder(t_num)
+                    st.toast(f"Reset Ticket #{t_num} to Not Sent.", icon="🔵")
+                    st.rerun()
+    with col_close:
+        if st.button("✖️ Close", key=f"dlg_close_{t_num}", use_container_width=True):
+            st.rerun()
+
+
 def ticket_card(row: pd.Series):
     st.markdown(f"""
         <div class="ticket-card">
@@ -633,6 +745,23 @@ def ticket_card(row: pd.Series):
     if str(row.get("Description", "")).strip() not in ("", "nan", "None"):
         with st.expander("📄 Description", expanded=True):
             st.write(row["Description"])
+            t_num_card = str(row.get('Ticket Number', '')).strip()
+            if st.button("🔍 Open Full Description in Center Modal Popup", key=f"btn_desc_lookup_{t_num_card}", use_container_width=True):
+                show_ticket_description_dialog(
+                    t_num=t_num_card,
+                    creator=str(row.get('Ticket Creator', '—')).strip(),
+                    matched_addr="",
+                    t_subj=str(row.get('Subject', '')).strip(),
+                    aging=int(row.get('Ticket Aging', 0) if pd.notna(row.get('Ticket Aging')) else 0),
+                    ticket_owner=str(row.get('Ticket Owner', 'Unassigned')).strip(),
+                    customer_name=str(row.get('Customer Name', '—')).strip(),
+                    start_date_val=str(row.get('Start Date', '—')).strip(),
+                    req_date_val=str(row.get('Required Date', '—')).strip(),
+                    est_date_val=str(row.get('Estimate Resolution Date', '—')).strip(),
+                    priority_val=str(row.get('Ticket Priority', 'Normal')).strip(),
+                    dept_val=str(row.get('Ticket Department', 'Support')).strip(),
+                    ticket_desc=str(row.get("Description", "")).strip()
+                )
 
 
 def related_list(df: pd.DataFrame, owner: str, exclude_ticket: str, empty_msg: str, offer_draft: bool, section_title: str):
@@ -1761,61 +1890,33 @@ with tab3:
             est_date_val = str(raw_ticket.get("Estimate Resolution Date", "—")).strip() if raw_ticket is not None else "—"
             priority_val = str(raw_ticket.get("Ticket Priority", "Normal")).strip() if raw_ticket is not None else "Normal"
             dept_val = str(raw_ticket.get("Ticket Department", "Support")).strip() if raw_ticket is not None else "Support"
-
-            with st.expander(f"💬 View Conversation & Description for {t_num} ({creator})", expanded=False):
-                # Section 1: Ticket Overview & Owner Metadata
-                st.markdown(f"##### 🎫 Ticket #{t_num}: {t_subj}")
-                
-                # Dedicated Owner & Assigned Analyst Callout
-                st.markdown(f"""
-                <div style="background: #f1f5f9; border-left: 4px solid #3b82f6; border-radius: 6px; padding: 0.6rem 0.9rem; margin: 0.4rem 0 0.8rem 0;">
-                    <div style="font-size: 0.88rem; color: #0f172a;">
-                        👨‍💻 <strong>Ticket Owner / Respondent:</strong> <span style="color: #1d4ed8; font-weight: 700;">{ticket_owner}</span> ({dept_val})
-                        &nbsp;&nbsp;•&nbsp;&nbsp;
-                        👤 <strong>Created By:</strong> <span style="color: #0369a1; font-weight: 600;">{creator}</span> ({matched_addr or 'No email'})
-                    </div>
-                    <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">
-                        🏢 Customer: <strong>{customer_name}</strong> &nbsp;|&nbsp; ⚡ Priority: <strong>{priority_val}</strong> &nbsp;|&nbsp; 📅 Opened: <strong>{start_date_val}</strong> &nbsp;|&nbsp; 🎯 Est. Resolution: <strong>{est_date_val}</strong> &nbsp;|&nbsp; ⏱️ Aging: <strong>{aging} days</strong>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Section 2: Ticket Description & Conversation History with Last Reply highlight
-                st.markdown("###### 📝 Ticket Description & Conversation Thread")
-                if ticket_desc and ticket_desc not in ("nan", "None", ""):
-                    # Detect if there are multiple replies/lines or a single block
-                    desc_paragraphs = [p.strip() for p in ticket_desc.split("\n") if p.strip()]
-                    initial_msg = desc_paragraphs[0] if desc_paragraphs else ticket_desc
-                    
-                    st.markdown(f"""
-                    <div class="conversation-box">
-                        <div class="conversation-bubble conversation-bubble-user">
-                            <div class="conversation-sender conversation-sender-user">
-                                <span>👤 Initial Inquiry by {creator}</span>
-                                <span class="conversation-time">📅 Opened: {start_date_val}</span>
-                            </div>
-                            <div class="conversation-text">{initial_msg}</div>
-                        </div>
-                        <div class="conversation-bubble conversation-bubble-support">
-                            <div class="conversation-sender conversation-sender-support">
-                                <span>👨‍💻 Last Reply / Investigation by Ticket Owner: <strong>{ticket_owner}</strong></span>
-                                <span class="conversation-time">⏱️ Status: Awaiting User Info ({aging} days)</span>
-                            </div>
-                            <div class="conversation-text"><strong>Latest Status Update:</strong> Ticket investigated by {ticket_owner}. Currently waiting on user clarification or confirmation from {creator} to proceed with resolution.</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    if len(desc_paragraphs) > 1:
-                        with st.expander("📋 Full Raw Description Text", expanded=False):
-                            st.write(ticket_desc)
-                else:
-                    st.info(f"No specific description text was attached to ticket #{t_num} in the uploaded Excel file.")
-
-                # Section 3: Outgoing Follow-Up Email Message
-                st.markdown("###### ✉️ Outgoing Follow-Up Reminder Draft")
-                st.text_area("Subject", item["email_subject"], key=f"subj_{t_num}", height=68, disabled=True)
-                st.text_area("Body", item["email_body"], key=f"body_{t_num}", height=180, disabled=True)
+            # Button to trigger the Modal Dialog Popup (Floating above UI in center)
+            if st.button(
+                f"💬 View Conversation & Description for {t_num} ({creator})",
+                key=f"btn_desc_modal_{t_num}",
+                use_container_width=True,
+                help="Click to open full ticket description and conversation in a centered popup modal"
+            ):
+                show_ticket_description_dialog(
+                    t_num=t_num,
+                    creator=creator,
+                    matched_addr=matched_addr,
+                    t_subj=t_subj,
+                    aging=aging,
+                    ticket_owner=ticket_owner,
+                    customer_name=customer_name,
+                    start_date_val=start_date_val,
+                    req_date_val=req_date_val,
+                    est_date_val=est_date_val,
+                    priority_val=priority_val,
+                    dept_val=dept_val,
+                    ticket_desc=ticket_desc,
+                    email_subject=item.get("email_subject", ""),
+                    email_body=item.get("email_body", ""),
+                    mailto_url=mailto_link,
+                    is_sent=is_sent,
+                    cfg_sender_email=cfg_sender_email
+                )
 
 
 
