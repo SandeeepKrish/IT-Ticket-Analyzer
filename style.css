@@ -421,72 +421,112 @@ header {
 }
 
 /* Premium Modern Tab Styling */
+div[data-testid="stTabs"] [data-baseweb="tab-list"],
 .stTabs [data-baseweb="tab-list"] {
-    display: flex;
+    display: flex !important;
     gap: 0.65rem !important;
-    background: #f1f5f9;
-    padding: 0.4rem 0.5rem;
-    border-radius: 14px;
-    border: 1px solid #e2e8f0;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
-    margin-bottom: 1.1rem;
-    align-items: center;
+    background: #f1f5f9 !important;
+    padding: 0.45rem !important;
+    border-radius: 18px !important;
+    border-top-left-radius: 18px !important;
+    border-top-right-radius: 18px !important;
+    border-bottom-left-radius: 18px !important;
+    border-bottom-right-radius: 18px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    margin-bottom: 1.15rem !important;
+    align-items: center !important;
 }
 
 /* Hide default BaseWeb harsh bottom underline bar */
+div[data-testid="stTabs"] [data-baseweb="tab-highlight"],
+div[data-testid="stTabs"] [data-baseweb="tab-border"],
 .stTabs [data-baseweb="tab-highlight"],
 .stTabs [data-baseweb="tab-border"] {
     display: none !important;
+    height: 0 !important;
+    border: none !important;
 }
 
-.stTabs [data-baseweb="tab"] {
-    background: #ffffff;
+div[data-testid="stTabs"] button[data-baseweb="tab"],
+div[data-testid="stTabs"] button[role="tab"],
+.stTabs [data-baseweb="tab"],
+.stTabs button[role="tab"] {
+    background: #ffffff !important;
     color: #475569 !important;
     border: 1.5px solid #e2e8f0 !important;
-    border-radius: 10px !important;
-    padding: 0.55rem 1.15rem !important;
+    border-radius: 14px !important;
+    border-top-left-radius: 14px !important;
+    border-top-right-radius: 14px !important;
+    border-bottom-left-radius: 14px !important;
+    border-bottom-right-radius: 14px !important;
+    overflow: hidden !important;
+    padding: 0.6rem 1.25rem !important;
     font-size: 0.88rem !important;
     font-weight: 600 !important;
-    letter-spacing: -0.01em;
-    cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    letter-spacing: -0.01em !important;
+    cursor: pointer !important;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
 }
 
+div[data-testid="stTabs"] button[data-baseweb="tab"]:hover,
+div[data-testid="stTabs"] button[role="tab"]:hover,
 .stTabs [data-baseweb="tab"]:hover {
-    background: #f8fafc;
+    background: #f8fafc !important;
     border-color: #cbd5e1 !important;
     color: #1e293b !important;
-    transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.07) !important;
 }
 
+div[data-testid="stTabs"] button[data-baseweb="tab"]:focus,
 .stTabs [data-baseweb="tab"]:focus {
     outline: none !important;
 }
 
+div[data-testid="stTabs"] button[data-baseweb="tab"]:active,
 .stTabs [data-baseweb="tab"]:active {
-    transform: translateY(0px) scale(0.98);
+    transform: translateY(0px) scale(0.98) !important;
 }
 
+div[data-testid="stTabs"] button[data-baseweb="tab"] p,
+div[data-testid="stTabs"] button[data-baseweb="tab"] span,
+div[data-testid="stTabs"] button[data-baseweb="tab"] div,
 .stTabs [data-baseweb="tab"] p,
-.stTabs [data-baseweb="tab"] span {
+.stTabs [data-baseweb="tab"] span,
+.stTabs [data-baseweb="tab"] div {
     font-size: 0.88rem !important;
     font-weight: 600 !important;
     margin: 0 !important;
     color: inherit !important;
+    border-radius: 14px !important;
 }
 
 /* Active / Selected Tab State (Modern Rounded Card, Vibrant Indigo-Blue Gradient, Subtle Glow) */
+div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"],
+div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
+div[data-testid="stTabs"] [aria-selected="true"],
+.stTabs [data-baseweb="tab"][aria-selected="true"],
 .stTabs [aria-selected="true"] {
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
     color: #ffffff !important;
     border: 1.5px solid transparent !important;
-    border-radius: 10px !important;
-    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
-    transform: translateY(-1px);
+    border-radius: 14px !important;
+    border-top-left-radius: 14px !important;
+    border-top-right-radius: 14px !important;
+    border-bottom-left-radius: 14px !important;
+    border-bottom-right-radius: 14px !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+    transform: translateY(-1px) !important;
 }
 
+div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] *,
+div[data-testid="stTabs"] [aria-selected="true"] *,
+div[data-testid="stTabs"] [aria-selected="true"] p,
+div[data-testid="stTabs"] [aria-selected="true"] span,
 .stTabs [aria-selected="true"] *,
 .stTabs [aria-selected="true"] p,
 .stTabs [aria-selected="true"] span {
@@ -494,9 +534,10 @@ header {
     font-weight: 600 !important;
 }
 
+div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"]:hover,
 .stTabs [aria-selected="true"]:hover {
     background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
-    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.42) !important;
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45) !important;
 }
 
 /* Owner filter styling */

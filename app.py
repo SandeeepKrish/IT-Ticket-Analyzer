@@ -1737,6 +1737,88 @@ with tab3:
     st.markdown("#### 📬 Ticket Follow-Up Queue")
     st.caption("🔴 **Red**: Mail already sent (persisted in SQLite) | 🟡 **Yellow**: Partially sent | 🔵 **Light Blue**: Not yet sent")
 
+    # Injected direct tab pill styles to guarantee immediate rounded border radius
+    st.markdown("""
+    <style>
+    div[data-testid="stTabs"] [data-baseweb="tab-list"],
+    .stTabs [data-baseweb="tab-list"] {
+        display: flex !important;
+        gap: 0.65rem !important;
+        background: #f1f5f9 !important;
+        padding: 0.45rem !important;
+        border-radius: 18px !important;
+        border: 1px solid #e2e8f0 !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+        margin-bottom: 1.15rem !important;
+        align-items: center !important;
+    }
+    div[data-testid="stTabs"] [data-baseweb="tab-highlight"],
+    div[data-testid="stTabs"] [data-baseweb="tab-border"],
+    .stTabs [data-baseweb="tab-highlight"],
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
+        height: 0 !important;
+        border: none !important;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"],
+    div[data-testid="stTabs"] button[role="tab"],
+    .stTabs [data-baseweb="tab"],
+    .stTabs button[role="tab"] {
+        background: #ffffff !important;
+        color: #475569 !important;
+        border: 1.5px solid #e2e8f0 !important;
+        border-radius: 14px !important;
+        border-top-left-radius: 14px !important;
+        border-top-right-radius: 14px !important;
+        border-bottom-left-radius: 14px !important;
+        border-bottom-right-radius: 14px !important;
+        overflow: hidden !important;
+        padding: 0.6rem 1.25rem !important;
+        font-size: 0.88rem !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"]:hover,
+    .stTabs [data-baseweb="tab"]:hover {
+        background: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+        color: #1e293b !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.07) !important;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"],
+    div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
+    div[data-testid="stTabs"] [aria-selected="true"],
+    .stTabs [data-baseweb="tab"][aria-selected="true"],
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+        color: #ffffff !important;
+        border: 1.5px solid transparent !important;
+        border-radius: 14px !important;
+        border-top-left-radius: 14px !important;
+        border-top-right-radius: 14px !important;
+        border-bottom-left-radius: 14px !important;
+        border-bottom-right-radius: 14px !important;
+        overflow: hidden !important;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+        transform: translateY(-1px) !important;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] *,
+    div[data-testid="stTabs"] [aria-selected="true"] *,
+    div[data-testid="stTabs"] [aria-selected="true"] p,
+    div[data-testid="stTabs"] [aria-selected="true"] span,
+    .stTabs [aria-selected="true"] *,
+    .stTabs [aria-selected="true"] p,
+    .stTabs [aria-selected="true"] span {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # Dual Dispatch Modes: Grouped Consolidated vs Individual Tickets
     tab_grouped_rem, tab_single_rem = st.tabs([
         f"👥 Grouped by Creator — Consolidated 1 Email ({len(grouped_creators)} Creators • {multi_creators_count} with >1 Tickets)",
