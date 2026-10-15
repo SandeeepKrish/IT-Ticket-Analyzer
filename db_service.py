@@ -7,10 +7,14 @@ enabling instant demo mode without requiring manual Excel file uploads.
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -94,11 +98,12 @@ def record_sent_reminder(
             """, (str(ticket_number).strip(), creator_name, recipient_email, subject, sent_by, delivery_mode))
         conn.close()
         return True
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to record sent reminder for ticket %s: %s", ticket_number, exc)
         return False
 
 
-def get_sent_reminders_map(db_path: str = DB_PATH) -> Dict[str, Dict[str, Any]]:
+def get_sent_reminders_map(db_path: str = DB_PATH) -> dict[str, dict[str, Any]]:
     """Return dictionary of ticket_number -> reminder record for quick lookup."""
     try:
         conn = get_connection(db_path)
@@ -118,7 +123,8 @@ def get_sent_reminders_map(db_path: str = DB_PATH) -> Dict[str, Dict[str, Any]]:
             }
             for r in rows
         }
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to load sent reminders map: %s", exc)
         return {}
 
 
@@ -130,12 +136,13 @@ def get_sent_reminders_dataframe(db_path: str = DB_PATH) -> pd.DataFrame:
             "SELECT ticket_number AS 'Ticket Number', creator_name AS 'Creator Name', "
             "recipient_email AS 'Recipient Email', subject AS 'Email Subject', "
             "sent_by AS 'Sent By', sent_at AS 'Sent At', delivery_mode AS 'Method' "
-            "FROM sent_reminders ORDER BY sent_at DESC", 
+            "FROM sent_reminders ORDER BY sent_at DESC",
             conn
         )
         conn.close()
         return df
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to load sent reminders dataframe: %s", exc)
         return pd.DataFrame()
 
 
@@ -149,12 +156,12 @@ def remove_sent_reminder(ticket_number: str, db_path: str = DB_PATH) -> bool:
             conn.execute("DELETE FROM sent_reminders WHERE ticket_number = ?", (str(ticket_number).strip(),))
         conn.close()
         return True
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to remove sent reminder for ticket %s: %s", ticket_number, exc)
         return False
 
 
-
-def generate_seed_data() -> Dict[str, pd.DataFrame]:
+def generate_seed_data() -> dict[str, pd.DataFrame]:
     """
     Generate realistic IT/ERP enterprise ticket datasets for demonstration.
     Reflects the company's real workflows (ERP Support, IT Infrastructure, QAD/SAP,
@@ -238,7 +245,7 @@ def generate_seed_data() -> Dict[str, pd.DataFrame]:
             "Estimate Resolution Date": "2026-09-30",
             "Description": "SMTP relay queue backlog observed during automated workflow trigger for POs exceeding threshold limit.",
         },
-        
+
         # --- Under Development Tickets ---
         {
             "Ticket Number": "IT-2026-0118",
@@ -592,7 +599,7 @@ def init_database(force_reseed: bool = False, db_path: str = DB_PATH) -> bool:
         # Check if master_tickets exists and has rows
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='master_tickets'")
         table_exists = cursor.fetchone() is not None
-        
+
         has_rows = False
         if table_exists:
             cursor.execute("SELECT count(*) FROM master_tickets")
@@ -609,10 +616,10 @@ def init_database(force_reseed: bool = False, db_path: str = DB_PATH) -> bool:
 
 
 def save_all_to_sqlite(
-    data_dict: Dict[str, pd.DataFrame],
+    data_dict: dict[str, pd.DataFrame],
     dataset_name: str = "Uploaded Dataset",
     db_path: str = DB_PATH
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """
     Save all 8 workflow stages + mail directory to SQLite.
     Overwrites previous demo/current tables with clean, indexed tables.
@@ -628,7 +635,7 @@ def save_all_to_sqlite(
                 clean_df = df.copy()
                 clean_df.columns = [str(c).strip() for c in clean_df.columns]
                 clean_df.to_sql(table_name, conn, if_exists="replace", index=False)
-        
+
         # Write metadata
         cursor = conn.cursor()
         cursor.execute("""
@@ -638,19 +645,20 @@ def save_all_to_sqlite(
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        total_tickets = len(data_dict.get("master", [])) if data_dict.get("master") is not None else 0
+        total_tickets = len(data_dict["master"]) if "master" in data_dict and data_dict["master"] is not None else 0
         cursor.execute("INSERT OR REPLACE INTO meta_info (key, value) VALUES ('dataset_name', ?)", (dataset_name,))
         cursor.execute("INSERT OR REPLACE INTO meta_info (key, value) VALUES ('ticket_count', ?)", (str(total_tickets),))
         cursor.execute("INSERT OR REPLACE INTO meta_info (key, value) VALUES ('last_updated', datetime('now'))", ())
         conn.commit()
         return True, f"Successfully saved dataset '{dataset_name}' with {total_tickets} tickets to SQLite!"
-    except Exception as e:
-        return False, f"Failed saving to SQLite: {str(e)}"
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed saving to SQLite: %s", exc)
+        return False, f"Failed saving to SQLite: {exc!s}"
     finally:
         conn.close()
 
 
-def load_all_from_sqlite(db_path: str = DB_PATH) -> Optional[Dict[str, pd.DataFrame]]:
+def load_all_from_sqlite(db_path: str = DB_PATH) -> dict[str, pd.DataFrame] | None:
     """
     Load all 8 workflow stages and mail directory from SQLite into DataFrames.
     Returns None if tables don't exist or are empty.
@@ -666,7 +674,7 @@ def load_all_from_sqlite(db_path: str = DB_PATH) -> Optional[Dict[str, pd.DataFr
         if not cursor.fetchone():
             return None
 
-        result: Dict[str, pd.DataFrame] = {}
+        result: dict[str, pd.DataFrame] = {}
         for key in TABLE_KEYS:
             table_name = TABLE_NAME_MAP[key]
             cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
@@ -687,13 +695,14 @@ def load_all_from_sqlite(db_path: str = DB_PATH) -> Optional[Dict[str, pd.DataFr
             return None
 
         return result
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed loading from SQLite: %s", exc)
         return None
     finally:
         conn.close()
 
 
-def get_sqlite_stats(db_path: str = DB_PATH) -> Dict[str, Any]:
+def get_sqlite_stats(db_path: str = DB_PATH) -> dict[str, Any]:
     """Get metadata and row counts for all tables in SQLite."""
     if not os.path.exists(db_path):
         return {"exists": False, "total_tickets": 0, "tables": {}}
@@ -701,8 +710,8 @@ def get_sqlite_stats(db_path: str = DB_PATH) -> Dict[str, Any]:
     conn = get_connection(db_path)
     try:
         cursor = conn.cursor()
-        stats: Dict[str, Any] = {"exists": True, "tables": {}, "total_tickets": 0, "dataset_name": "Demo Dataset"}
-        
+        stats: dict[str, Any] = {"exists": True, "tables": {}, "total_tickets": 0, "dataset_name": "Demo Dataset"}
+
         # Check metadata
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='meta_info'")
         if cursor.fetchone():
@@ -722,13 +731,14 @@ def get_sqlite_stats(db_path: str = DB_PATH) -> Dict[str, Any]:
                 stats["tables"][key] = 0
 
         return stats
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed getting SQLite stats: %s", exc)
         return {"exists": False, "total_tickets": 0, "tables": {}}
     finally:
         conn.close()
 
 
-def export_database_to_excel_folder(folder_path: str = DEMO_FOLDER_PATH, db_path: str = DB_PATH) -> Tuple[bool, str]:
+def export_database_to_excel_folder(folder_path: str = DEMO_FOLDER_PATH, db_path: str = DB_PATH) -> tuple[bool, str]:
     """
     Export all 9 SQLite tables into standalone .xlsx files in the demo folder.
     This creates the folder so users can open it and select files or showcase folder upload.
@@ -751,11 +761,12 @@ def export_database_to_excel_folder(folder_path: str = DEMO_FOLDER_PATH, db_path
                 df.to_excel(target_file, index=False, engine="openpyxl")
 
         return True, f"All 9 demo Excel files successfully created in '{os.path.basename(folder_path)}/' folder!"
-    except Exception as e:
-        return False, f"Export failed: {str(e)}"
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Excel export failed: %s", exc)
+        return False, f"Export failed: {exc!s}"
 
 
-def load_from_demo_folder(folder_path: str = DEMO_FOLDER_PATH) -> Optional[Dict[str, pd.DataFrame]]:
+def load_from_demo_folder(folder_path: str = DEMO_FOLDER_PATH) -> dict[str, pd.DataFrame] | None:
     """
     Load dataframes directly from the demo_files folder on disk.
     Auto-detects files matching the expected names.
@@ -769,16 +780,12 @@ def load_from_demo_folder(folder_path: str = DEMO_FOLDER_PATH) -> Optional[Dict[
 
     from ai import detect_file_type  # Reuse fuzzy matching
 
-    result: Dict[str, Any] = {
-        'master': None, 'wip': None, 'dev': None, 'wait': None,
-        'hold': None, 'open': None, 'pending': None, 'closed': None,
-        'mail_to': None
-    }
+    result: dict[str, pd.DataFrame] = {k: pd.DataFrame() for k in TABLE_KEYS}
 
     for file_path in files:
         filename = os.path.basename(file_path)
         cat = detect_file_type(filename)
-        if cat:
+        if cat and cat in result:
             try:
                 if file_path.endswith(".csv"):
                     df = pd.read_csv(file_path)
@@ -790,11 +797,11 @@ def load_from_demo_folder(folder_path: str = DEMO_FOLDER_PATH) -> Optional[Dict[
                 if "Ticket Aging" in df.columns:
                     df["Ticket Aging"] = pd.to_numeric(df["Ticket Aging"], errors="coerce").fillna(0).astype(int)
                 result[cat] = df
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Failed parsing demo file %s: %s", file_path, exc)
 
     core_keys = ["master", "wip", "dev", "wait", "hold", "open", "pending", "closed"]
-    if any(result.get(k) is None or result[k].empty for k in core_keys):
+    if any(result[k].empty for k in core_keys):
         return None
 
     return result
