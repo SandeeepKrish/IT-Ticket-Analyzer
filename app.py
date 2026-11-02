@@ -52,9 +52,7 @@ from ai import (
     validate_folder_upload,
 )
 from footer import render_footer
-import importlib
 import mail_service
-importlib.reload(mail_service)
 from mail_service import (
     build_email_directory,
     find_creator_email,
@@ -80,25 +78,52 @@ from db_service import (
 )
 
 
-# Auto-initialize SQLite database with demo data if empty
-try:
-    init_database()
-except Exception:
-    pass
+# Auto-initialize SQLite database with demo data only once if missing
+if not os.path.exists(DB_PATH):
+    try:
+        init_database()
+    except Exception:
+        pass
+
+
+@st.cache_data(show_spinner=False)
+def get_cached_sqlite_data() -> Optional[Dict[str, pd.DataFrame]]:
+    """Cached loader for SQLite database to prevent redundant disk I/O on every interaction."""
+    return load_all_from_sqlite()
+
+
+MONTH_NAME_TO_NUM = {
+    "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6,
+    "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12
+}
+
+
+def _prepare_df_dates(df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+    """Helper to pre-parse dates into integer year/month columns once, avoiding repeat pd.to_datetime calls."""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return df
+    if "Start Date" in df.columns and "_dt_year" not in df.columns:
+        dt_series = pd.to_datetime(df["Start Date"], errors="coerce")
+        df["_dt_year"] = dt_series.dt.year
+        df["_dt_month"] = dt_series.dt.month
+    return df
 
 
 def load_dataset_into_session(data_dict: Dict[str, Any], source_label: str = "SQLite Database") -> None:
-    """Store loaded dataset (all 8 stages + mail_to) into session state."""
+    """Store loaded dataset (all stages + mail_to) into session state."""
     st.session_state["folder_data_loaded"] = True
     st.session_state["data_source_mode"] = source_label
-    st.session_state["master_df"] = data_dict.get("master")
-    st.session_state["wip_df"] = data_dict.get("wip")
-    st.session_state["dev_df"] = data_dict.get("dev")
-    st.session_state["wait_df"] = data_dict.get("wait")
-    st.session_state["hold_df"] = data_dict.get("hold")
-    st.session_state["open_df"] = data_dict.get("open")
-    st.session_state["pending_df"] = data_dict.get("pending")
-    st.session_state["closed_df"] = data_dict.get("closed")
+    stage_keys = ["master", "wip", "dev", "wait", "hold", "open", "pending", "pending_change", "closed"]
+    for k in stage_keys:
+        df = data_dict.get(k)
+        if df is not None and isinstance(df, pd.DataFrame):
+            _prepare_df_dates(df)
+            st.session_state[f"{k}_df"] = df
+        else:
+            if k == "pending_change":
+                st.session_state["pending_change_df"] = pd.DataFrame(columns=REQUIRED_COLS)
+            else:
+                st.session_state[f"{k}_df"] = None
     st.session_state["mail_to_df"] = data_dict.get("mail_to", None)
 
 
@@ -106,7 +131,7 @@ def clear_loaded_session_data() -> None:
     """Clear all loaded dataset keys from session state."""
     keys_to_clear = [
         "folder_data_loaded", "data_source_mode", "master_df", "wip_df",
-        "dev_df", "wait_df", "hold_df", "open_df", "pending_df", "closed_df", "mail_to_df"
+        "dev_df", "wait_df", "hold_df", "open_df", "pending_df", "pending_change_df", "closed_df", "mail_to_df"
     ]
     for k in keys_to_clear:
         if k in st.session_state:
@@ -120,12 +145,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Load external CSS stylesheet
+# Load external CSS stylesheet (cached in memory)
+@st.cache_data(show_spinner=False)
+def _read_css(css_path: str) -> str:
+    with open(css_path, "r", encoding="utf-8") as f:
+        return f.read()
+
 def _load_css(css_path: str) -> None:
     """Read a CSS file and inject it into the Streamlit page."""
-    with open(css_path, "r", encoding="utf-8") as f:
-        css = f.read()
-    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+    st.markdown(f"<style>{_read_css(css_path)}</style>", unsafe_allow_html=True)
 
 _load_css(os.path.join(os.path.dirname(__file__), "style.css"))
 
@@ -170,14 +198,22 @@ def display_filter_results(df: pd.DataFrame, category_name: str, owner_filter: A
 
 def display_monthly_breakdown(df: pd.DataFrame, year: str, category_name: str):
     """Display monthly breakdown for a specific year"""
-    if df.empty or "Start Date" not in df.columns:
+    if df.empty:
         return
         
-    df_temp = df.copy()
-    df_temp["Start Date"] = pd.to_datetime(df_temp["Start Date"], errors='coerce')
-    
-    # Group by month
-    monthly_counts = df_temp.groupby(df_temp["Start Date"].dt.month).size()
+    if "_dt_month" in df.columns:
+        if year != "All Years" and "_dt_year" in df.columns:
+            sub = df[df["_dt_year"] == year]
+        else:
+            sub = df
+        monthly_counts = sub["_dt_month"].value_counts().to_dict()
+    elif "Start Date" in df.columns:
+        df_temp = pd.to_datetime(df["Start Date"], errors='coerce')
+        if year != "All Years":
+            df_temp = df_temp[df_temp.dt.year == year]
+        monthly_counts = df_temp.dt.month.value_counts().to_dict()
+    else:
+        return
     
     month_names = {
         1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
@@ -219,80 +255,95 @@ def display_owner_breakdown(df: pd.DataFrame, category_name: str):
 
 def extract_date_filters(df: pd.DataFrame):
     """Extract unique years and months from Start Date column for filtering"""
-    if df.empty or "Start Date" not in df.columns:
+    if df.empty:
         return [], []
     
-    # Convert Start Date to datetime
-    df_temp = df.copy()
-    df_temp["Start Date"] = pd.to_datetime(df_temp["Start Date"], errors='coerce')
-    
-    # Extract years and months
-    years = sorted(df_temp["Start Date"].dt.year.dropna().unique())
+    if "_dt_year" in df.columns:
+        years = sorted([int(y) for y in df["_dt_year"].dropna().unique()])
+    elif "Start Date" in df.columns:
+        years = sorted([int(y) for y in pd.to_datetime(df["Start Date"], errors='coerce').dt.year.dropna().unique()])
+    else:
+        return [], []
     months = [
         "All Months", "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
     ]
-    
     return years, months
 
 
 def filter_by_date(df: pd.DataFrame, selected_year, selected_month):
-    """Filter dataframe by year and month"""
-    if df.empty or "Start Date" not in df.columns:
+    """Filter dataframe by year and month quickly using pre-computed columns."""
+    if df.empty:
         return df
     
-    df_filtered = df.copy()
-    df_filtered["Start Date"] = pd.to_datetime(df_filtered["Start Date"], errors='coerce')
+    if "_dt_year" in df.columns and "_dt_month" in df.columns:
+        mask = pd.Series(True, index=df.index)
+        if selected_year != "All Years":
+            mask &= (df["_dt_year"] == selected_year)
+        if selected_month != "All Months":
+            m_num = MONTH_NAME_TO_NUM.get(selected_month)
+            if m_num:
+                mask &= (df["_dt_month"] == m_num)
+        return df[mask]
+
+    if "Start Date" not in df.columns:
+        return df
     
-    # Filter by year
+    df_temp = pd.to_datetime(df["Start Date"], errors='coerce')
+    mask = pd.Series(True, index=df.index)
     if selected_year != "All Years":
-        df_filtered = df_filtered[df_filtered["Start Date"].dt.year == selected_year]
-    
-    # Filter by month
+        mask &= (df_temp.dt.year == selected_year)
     if selected_month != "All Months":
-        month_num = {
-            "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6,
-            "July": 7, "August": 8, "September": 9, "October": 10, "November": 11, "December": 12
-        }[selected_month]
-        df_filtered = df_filtered[df_filtered["Start Date"].dt.month == month_num]
-    
-    return df_filtered
+        m_num = MONTH_NAME_TO_NUM.get(selected_month)
+        if m_num:
+            mask &= (df_temp.dt.month == m_num)
+    return df[mask]
 
 
-def get_combined_date_filters(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df):
+def get_combined_date_filters(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df):
     """Get combined years from all dataframes for consistent filtering"""
     all_years = set()
+    for df in [master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df]:
+        if df is not None and not df.empty:
+            if "_dt_year" in df.columns:
+                all_years.update(df["_dt_year"].dropna().unique())
+            elif "Start Date" in df.columns:
+                years = pd.to_datetime(df["Start Date"], errors='coerce').dt.year.dropna().unique()
+                all_years.update(years)
     
-    for df in [master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df]:
-        if df is not None and not df.empty and "Start Date" in df.columns:
-            df_temp = df.copy()
-            df_temp["Start Date"] = pd.to_datetime(df_temp["Start Date"], errors='coerce')
-            years = df_temp["Start Date"].dt.year.dropna().unique()
-            all_years.update(years)
-    
-    sorted_years = ["All Years"] + sorted(list(all_years))
+    sorted_years = ["All Years"] + sorted([int(y) for y in all_years if pd.notna(y)])
     months = [
         "All Months", "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
     ]
-    
     return sorted_years, months
 
 
 def display_user_statistics(wip_df: pd.DataFrame, dev_df: pd.DataFrame, wait_df: pd.DataFrame, 
                            hold_df: pd.DataFrame, open_df: pd.DataFrame, pending_df: pd.DataFrame, 
-                           closed_df: pd.DataFrame, selected_owner: Any, year_filter=None, month_filter=None):
+                           pending_change_df: pd.DataFrame, closed_df: pd.DataFrame, selected_owner: Any, 
+                           year_filter=None, month_filter=None):
     """Display statistics for the selected owner with animated counters"""
     if selected_owner == "All owners":
         return
     
+    m_num = MONTH_NAME_TO_NUM.get(month_filter) if month_filter else None
+
     def _count(df):
         if df is None or df.empty or "Ticket Owner" not in df.columns:
             return 0
-        sub_df = df[df["Ticket Owner"] == selected_owner]
-        if year_filter and month_filter:
-            return len(filter_by_date(sub_df, year_filter, month_filter))
-        return len(sub_df)
+        mask = (df["Ticket Owner"] == selected_owner)
+        if year_filter and year_filter != "All Years":
+            if "_dt_year" in df.columns:
+                mask &= (df["_dt_year"] == year_filter)
+            elif "Start Date" in df.columns:
+                mask &= (pd.to_datetime(df["Start Date"], errors="coerce").dt.year == year_filter)
+        if m_num:
+            if "_dt_month" in df.columns:
+                mask &= (df["_dt_month"] == m_num)
+            elif "Start Date" in df.columns:
+                mask &= (pd.to_datetime(df["Start Date"], errors="coerce").dt.month == m_num)
+        return int(mask.sum())
 
     wip_count = _count(wip_df)
     dev_count = _count(dev_df)
@@ -300,9 +351,10 @@ def display_user_statistics(wip_df: pd.DataFrame, dev_df: pd.DataFrame, wait_df:
     hold_count = _count(hold_df)
     open_count = _count(open_df)
     pending_count = _count(pending_df)
+    pending_change_count = _count(pending_change_df)
     closed_count = _count(closed_df)
     
-    total_active = wip_count + dev_count + wait_count + hold_count + open_count + pending_count
+    total_active = wip_count + dev_count + wait_count + hold_count + open_count + pending_count + pending_change_count
     
     # Display date range info
     date_info = ""
@@ -340,6 +392,10 @@ def display_user_statistics(wip_df: pd.DataFrame, dev_df: pd.DataFrame, wait_df:
                 <div class="stat-number animate-count">{pending_count}</div>
                 <div class="stat-label">Pending</div>
             </div>
+            <div class="user-stat-card" style="--border-color: #0284c7; --number-color: #0284c7;">
+                <div class="stat-number animate-count">{pending_change_count}</div>
+                <div class="stat-label">Pending Change</div>
+            </div>
             <div class="user-stat-card" style="--border-color: #6c757d; --number-color: #6c757d;">
                 <div class="stat-number animate-count">{closed_count}</div>
                 <div class="stat-label">Closed</div>
@@ -353,7 +409,7 @@ def display_user_statistics(wip_df: pd.DataFrame, dev_df: pd.DataFrame, wait_df:
     """, unsafe_allow_html=True)
 
 
-def get_ticket_workflow_status(ticket_no: str, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, master_df):
+def get_ticket_workflow_status(ticket_no: str, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, master_df):
     """Determine ticket's current status in the workflow and return detailed information"""
     
     # Check if ticket exists in master list
@@ -374,6 +430,8 @@ def get_ticket_workflow_status(ticket_no: str, wip_df, dev_df, wait_df, hold_df,
         "wip": wip_df[wip_df["Ticket Number"].str.upper() == ticket_no.upper()],
         "hold": hold_df[hold_df["Ticket Number"].str.upper() == ticket_no.upper()],
         "pending": pending_df[pending_df["Ticket Number"].str.upper() == ticket_no.upper()],
+        "pending_change": (pending_change_df[pending_change_df["Ticket Number"].str.upper() == ticket_no.upper()] 
+                           if pending_change_df is not None and not pending_change_df.empty else pd.DataFrame()),
         "open": open_df[open_df["Ticket Number"].str.upper() == ticket_no.upper()]
     }
     
@@ -424,6 +482,12 @@ def get_ticket_workflow_status(ticket_no: str, wip_df, dev_df, wait_df, hold_df,
             "description": "Change request raised but not yet started by backend team", 
             "color": "#ffc107",
             "next_step": "Waiting for backend team to begin work"
+        },
+        "pending_change": {
+            "title": "🔄 Pending Change",
+            "description": "Change request submitted and awaiting approval or deployment", 
+            "color": "#0284c7",
+            "next_step": "Awaiting change board authorization / rollout"
         },
         "open": {
             "title": "🟢 Open",
@@ -522,22 +586,36 @@ def display_workflow_diagram():
 
 
 def get_filtered_data(df: pd.DataFrame, owner_filter: Any, year_filter=None, month_filter=None, creator_filter: Any = "All creators") -> pd.DataFrame:
-    """Filter dataframe by owner, creator, year, and month"""
-    filtered_df = df.copy()
+    """Filter dataframe by owner, creator, year, and month quickly without redundant copies."""
+    if df is None or df.empty:
+        return pd.DataFrame()
+    
+    mask = pd.Series(True, index=df.index)
     
     # Filter by owner
-    if owner_filter != "All owners" and "Ticket Owner" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Ticket Owner"] == owner_filter]
+    if owner_filter != "All owners" and "Ticket Owner" in df.columns:
+        mask &= (df["Ticket Owner"] == owner_filter)
     
     # Filter by creator
-    if creator_filter != "All creators" and "Ticket Creator" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Ticket Creator"] == creator_filter]
+    if creator_filter != "All creators" and "Ticket Creator" in df.columns:
+        mask &= (df["Ticket Creator"] == creator_filter)
     
     # Filter by date if filters are provided
     if year_filter is not None and month_filter is not None:
-        filtered_df = filter_by_date(filtered_df, year_filter, month_filter)
+        if year_filter != "All Years":
+            if "_dt_year" in df.columns:
+                mask &= (df["_dt_year"] == year_filter)
+            elif "Start Date" in df.columns:
+                mask &= (pd.to_datetime(df["Start Date"], errors="coerce").dt.year == year_filter)
+        if month_filter != "All Months":
+            m_num = MONTH_NAME_TO_NUM.get(month_filter)
+            if m_num:
+                if "_dt_month" in df.columns:
+                    mask &= (df["_dt_month"] == m_num)
+                elif "Start Date" in df.columns:
+                    mask &= (pd.to_datetime(df["Start Date"], errors="coerce").dt.month == m_num)
     
-    return pd.DataFrame(filtered_df)
+    return df[mask]
 
 
 
@@ -556,6 +634,7 @@ def load_excel(uploaded_file) -> pd.DataFrame:
     df["Ticket Number"] = df["Ticket Number"].astype(str).str.strip()
     if "Ticket Aging" in df.columns:
         df["Ticket Aging"] = pd.to_numeric(df["Ticket Aging"], errors="coerce").fillna(0).astype(int)
+    _prepare_df_dates(df)
     return df
 
 
@@ -784,7 +863,7 @@ def related_list(df: pd.DataFrame, owner: str, exclude_ticket: str, empty_msg: s
     st.markdown('</div>', unsafe_allow_html=True)
 
 
-def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, mail_to_df=None):
+def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, mail_to_df=None):
     """Render an AI ticket assistant chat box that answers questions about uploaded Excel files."""
     st.divider()
     
@@ -811,18 +890,6 @@ def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_d
                 st.session_state["chatbot_messages"] = []
                 st.session_state["chatbot_open"] = False
                 st.rerun()
-
-        data_ctx = generate_data_context(
-            master_df=master_df,
-            wip_df=wip_df,
-            dev_df=dev_df,
-            wait_df=wait_df,
-            hold_df=hold_df,
-            open_df=open_df,
-            pending_df=pending_df,
-            closed_df=closed_df,
-            mail_to_df=mail_to_df
-        )
 
         # OpenAI Key configuration & Status
         has_api = has_key_configured()
@@ -902,6 +969,18 @@ def render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_d
             st.session_state["chatbot_messages"].append({"role": "user", "content": prompt})
             
             with st.spinner("Analyzing Excel data with AI..."):
+                data_ctx = generate_data_context(
+                    master_df=master_df,
+                    wip_df=wip_df,
+                    dev_df=dev_df,
+                    wait_df=wait_df,
+                    hold_df=hold_df,
+                    open_df=open_df,
+                    pending_df=pending_df,
+                    pending_change_df=pending_change_df,
+                    closed_df=closed_df,
+                    mail_to_df=mail_to_df
+                )
                 response_text = get_chatbot_response(
                     user_question=prompt,
                     data_context=data_ctx,
@@ -921,7 +1000,7 @@ with st.sidebar:
     st.caption("Run the project directly using data stored in SQLite database (no file upload required):")
     
     if st.button("⚡ Load SQLite Database", key="btn_load_sqlite_demo", use_container_width=True, type="primary"):
-        data = load_all_from_sqlite()
+        data = get_cached_sqlite_data()
         if data:
             load_dataset_into_session(data, source_label="SQLite Database")
             st.toast("✅ SQLite Database loaded successfully!", icon="🚀")
@@ -963,14 +1042,14 @@ with st.sidebar:
     
     # ============ FAST FOLDER UPLOAD (NEW!) ============
     st.markdown("### ⚡ Fast Folder Upload (New!)")
-    st.caption("Upload a folder containing all 9 Excel files. Files are auto-detected by name and mapped to their categories.")
+    st.caption("Upload a folder containing all Excel files. Files are auto-detected by name and mapped to their categories.")
     
     folder_files = st.file_uploader(
         "📁 Select all Excel files from your folder",
         type="xlsx",
         accept_multiple_files=True,
         key="folder_upload",
-        help="Upload all 9 files at once. Files will be auto-detected by filename (e.g., master_file.xlsx, mail_to.xlsx, etc.)"
+        help="Upload files at once. Files will be auto-detected by filename (e.g., master_file.xlsx, pending_change.xlsx, mail_to.xlsx, etc.)"
     )
     
     if folder_files:
@@ -979,24 +1058,17 @@ with st.sidebar:
         
         if is_valid:
             has_mailto = folder_result.get("mail_to") is not None
+            has_pc = folder_result.get("pending_change") is not None
+            count_valid = 9 if has_pc else 8
             if has_mailto:
-                st.success("✅ All 8 ticket workflow files + Mail Directory detected and validated!")
+                st.success(f"✅ All {count_valid} ticket workflow files + Mail Directory detected and validated!")
             else:
-                st.success("✅ All 8 ticket workflow files detected and validated!")
+                st.success(f"✅ All {count_valid} ticket workflow files detected and validated!")
             summary = get_folder_upload_summary(folder_result)
             st.caption(summary)
             
             if st.button("📤 Use Folder Data", key="use_folder_data", use_container_width=True):
-                st.session_state["folder_data_loaded"] = True
-                st.session_state["master_df"] = folder_result.get("master")
-                st.session_state["wip_df"] = folder_result.get("wip")
-                st.session_state["dev_df"] = folder_result.get("dev")
-                st.session_state["wait_df"] = folder_result.get("wait")
-                st.session_state["hold_df"] = folder_result.get("hold")
-                st.session_state["open_df"] = folder_result.get("open")
-                st.session_state["pending_df"] = folder_result.get("pending")
-                st.session_state["closed_df"] = folder_result.get("closed")
-                st.session_state["mail_to_df"] = folder_result.get("mail_to", None)
+                load_dataset_into_session(folder_result, source_label="Folder Upload")
                 st.success("✅ Folder data loaded! Reloading app...")
                 st.rerun()
         else:
@@ -1021,16 +1093,19 @@ with st.sidebar:
         
         st.markdown("**⚠️ WAIT**")
         wait_file = st.file_uploader("Awaiting User Info", type="xlsx", key="wait", label_visibility="collapsed", help="Awaiting User Info tickets")
-    
-    with col2:
+
         st.markdown("**⏸️ HOLD**")
         hold_file = st.file_uploader("Hold Tickets", type="xlsx", key="hold", label_visibility="collapsed", help="Hold tickets")
-        
+    
+    with col2:
         st.markdown("**🟢 OPEN**")
         open_file = st.file_uploader("Open Tickets", type="xlsx", key="open", label_visibility="collapsed", help="Open tickets")
         
         st.markdown("**🟠 PENDING**")
         pending_file = st.file_uploader("Pending Tickets", type="xlsx", key="pending", label_visibility="collapsed", help="Pending tickets")
+
+        st.markdown("**🔄 PENDING CHANGE**")
+        pending_change_file = st.file_uploader("Pending Change", type="xlsx", key="pending_change", label_visibility="collapsed", help="Pending Change tickets")
         
         st.markdown("**⚫ CLOSED**")
         closed_file = st.file_uploader("Closed Tickets", type="xlsx", key="closed", label_visibility="collapsed", help="Closed tickets")
@@ -1082,6 +1157,9 @@ if use_folder_data:
     hold_df = st.session_state.get("hold_df")
     open_df = st.session_state.get("open_df")
     pending_df = st.session_state.get("pending_df")
+    pending_change_df = st.session_state.get("pending_change_df")
+    if pending_change_df is None:
+        pending_change_df = pd.DataFrame(columns=REQUIRED_COLS)
     closed_df = st.session_state.get("closed_df")
     mail_to_df = st.session_state.get("mail_to_df", None)
 
@@ -1089,7 +1167,7 @@ if use_folder_data:
         st.markdown("""
         <div class="welcome-section">
             <div class="welcome-title">🚀 Folder Data Incomplete</div>
-            <div class="welcome-text">Please re-upload your folder files or select all 8 Excel files in the sidebar.</div>
+            <div class="welcome-text">Please re-upload your folder files or select all required Excel files in the sidebar.</div>
         </div>
         """, unsafe_allow_html=True)
         render_footer()
@@ -1102,6 +1180,7 @@ if use_folder_data:
     assert isinstance(hold_df, pd.DataFrame)
     assert isinstance(open_df, pd.DataFrame)
     assert isinstance(pending_df, pd.DataFrame)
+    assert isinstance(pending_change_df, pd.DataFrame)
     assert isinstance(closed_df, pd.DataFrame)
 else:
     # Load from manual uploads
@@ -1128,13 +1207,13 @@ else:
                     </div>
                     <div class="qs-card-title" style="font-size: 1.08rem; font-weight: 700; color: #0f172a; margin-bottom: 0.45rem;">Load SQLite Database</div>
                     <div class="qs-card-desc" style="font-size: 0.84rem; color: #64748b; line-height: 1.5; margin-bottom: 1.35rem;">
-                        Launch instantly using our built-in SQLite database containing all 8 ticket workflow stages and mail directory.
+                        Launch instantly using our built-in SQLite database containing all ticket workflow stages and mail directory.
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
                 if st.button("⚡ Load SQLite Database", key="btn_welcome_sqlite", use_container_width=True, type="primary"):
-                    data = load_all_from_sqlite()
+                    data = get_cached_sqlite_data()
                     if data:
                         load_dataset_into_session(data, source_label="SQLite Database")
                         st.rerun()
@@ -1146,7 +1225,7 @@ else:
 
 
 
-    # Load 8 core workflow files
+    # Load workflow files
     master_df = load_excel(master_file)
     wip_df = load_excel(wip_file)
     dev_df = load_excel(dev_file) 
@@ -1154,6 +1233,7 @@ else:
     hold_df = load_excel(hold_file)
     open_df = load_excel(open_file)
     pending_df = load_excel(pending_file)
+    pending_change_df = load_excel(pending_change_file) if pending_change_file is not None else pd.DataFrame(columns=REQUIRED_COLS)
     closed_df = load_excel(closed_file)
     mail_to_df = load_excel(mail_to_file) if mail_to_file is not None else st.session_state.get("mail_to_df", None)
 
@@ -1165,10 +1245,11 @@ else:
     st.session_state["hold_df"] = hold_df
     st.session_state["open_df"] = open_df
     st.session_state["pending_df"] = pending_df
+    st.session_state["pending_change_df"] = pending_change_df
     st.session_state["closed_df"] = closed_df
     st.session_state["mail_to_df"] = mail_to_df
 
-# Validate the 8 core ticket workflow files have required columns
+# Validate the core ticket workflow files have required columns
 files_to_validate = [
     (master_df, "Master Ticket List"),
     (wip_df, "Work in Progress"),
@@ -1179,6 +1260,8 @@ files_to_validate = [
     (pending_df, "Pending"),
     (closed_df, "Closed")
 ]
+if pending_change_df is not None and not pending_change_df.empty:
+    files_to_validate.append((pending_change_df, "Pending Change"))
 
 for df, label in files_to_validate:
     if not validate_columns(df, label):
@@ -1191,11 +1274,12 @@ if source_mode:
     col_banner, col_banner_btn = st.columns([5, 1])
     with col_banner:
         contacts_count = len(mail_to_df) if mail_to_df is not None else 0
+        stages_count = 9 if (pending_change_df is not None and not pending_change_df.empty) else 8
         st.markdown(f"""
         <div class="demo-banner">
             <div class="demo-banner-content">
                 <span class="{badge_cls}">{source_mode}</span>
-                <span>Active Demo Dataset: <strong>{len(master_df)} tickets</strong> across 8 workflow stages • <strong>{contacts_count} mail contacts</strong>. Ready for presentation & testing!</span>
+                <span>Active Demo Dataset: <strong>{len(master_df)} tickets</strong> across {stages_count} workflow stages • <strong>{contacts_count} mail contacts</strong>. Ready for presentation & testing!</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1204,7 +1288,7 @@ if source_mode:
             clear_loaded_session_data()
             st.rerun()
 
-# Enhanced metrics display for all 8 categories with fast count-up animation
+# Enhanced metrics display for all categories with fast count-up animation
 st.html(f"""
 <div class="metric-container">
     <div class="metric-card" style="border-left: 3px solid #17a2b8;">
@@ -1237,6 +1321,10 @@ st.html(f"""
         <div class="metric-value counter-value" data-target="{len(pending_df)}" style="color: #ffc107; text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">{len(pending_df)}</div>
         <div class="metric-label">Pending</div>
     </div>
+    <div class="metric-card pending-change-metric">
+        <div class="metric-value counter-value" data-target="{len(pending_change_df)}" style="color: #0284c7;">{len(pending_change_df)}</div>
+        <div class="metric-label">Pending Change</div>
+    </div>
     <div class="metric-card closed-metric">
         <div class="metric-value counter-value" data-target="{len(closed_df)}" style="color: #6c757d;">{len(closed_df)}</div>
         <div class="metric-label">Closed</div>
@@ -1245,138 +1333,41 @@ st.html(f"""
 
 <script>
 (function() {{
-    let userHasScrolled = false;
-    const releaseScroll = () => {{ 
-        userHasScrolled = true;
-        if (window._lockTopInterval) {{
-            clearInterval(window._lockTopInterval);
-            window._lockTopInterval = null;
+    const counters = document.querySelectorAll('.counter-value[data-target]');
+    if (!counters || !counters.length) return;
+
+    counters.forEach(counter => {{
+        const target = parseInt(counter.getAttribute('data-target'), 10) || 0;
+        if (counter._animating) return;
+        if (target <= 1) {{
+            counter.textContent = target;
+            return;
         }}
-    }};
+        counter._animating = true;
+        const duration = 400;
+        const startTime = performance.now();
 
-    // Intercept programmatic scrollIntoView so lower elements don't yank the viewport down
-    if (!window._origScrollIntoView) {{
-        window._origScrollIntoView = Element.prototype.scrollIntoView;
-        Element.prototype.scrollIntoView = function() {{
-            if (!userHasScrolled) return;
-            return window._origScrollIntoView.apply(this, arguments);
-        }};
-    }}
+        function step(now) {{
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const ease = 1 - Math.pow(1 - progress, 3);
+            counter.textContent = Math.floor(ease * target);
 
-    // Intercept native focus so chat inputs or other lower elements cannot autofocus-scroll on load
-    if (!window._origFocus) {{
-        window._origFocus = HTMLElement.prototype.focus;
-        HTMLElement.prototype.focus = function(options) {{
-            if (this.tagName === 'TEXTAREA' && this.closest && this.closest('[data-testid="stChatInput"]')) {{
-                if (!window._userEngagedWithChat) {{
-                    return;
-                }}
-            }}
-            return window._origFocus.apply(this, arguments);
-        }};
-    }}
-
-    document.addEventListener('click', function(e) {{
-        if (e.target && e.target.closest && e.target.closest('[data-testid="stChatInput"]')) {{
-            window._userEngagedWithChat = true;
-        }}
-    }}, true);
-
-    function lockTop() {{
-        if (userHasScrolled) return;
-        const targets = [
-            document.querySelector('section.main'),
-            document.querySelector('.stAppViewContainer'),
-            document.querySelector('[data-testid="stAppViewContainer"]'),
-            document.querySelector('[data-testid="stMain"]'),
-            document.documentElement,
-            document.body
-        ];
-        targets.forEach(t => {{
-            if (t && t.scrollTop > 0) t.scrollTop = 0;
-        }});
-        if (window.scrollY > 0) window.scrollTo(0, 0);
-    }}
-
-    // Keep viewport anchored to top continuously across full page load
-    lockTop();
-    if (window._lockTopInterval) clearInterval(window._lockTopInterval);
-    window._lockTopInterval = setInterval(lockTop, 30);
-    setTimeout(() => {{
-        if (window._lockTopInterval) {{
-            clearInterval(window._lockTopInterval);
-            window._lockTopInterval = null;
-        }}
-        lockTop();
-    }}, 4500);
-
-    // Only allow manual scroll after initial settle
-    setTimeout(() => {{
-        window.addEventListener('wheel', (e) => {{
-            if (Math.abs(e.deltaY) > 8) releaseScroll();
-        }}, {{ passive: true }});
-        window.addEventListener('touchmove', releaseScroll, {{ passive: true }});
-        window.addEventListener('keydown', (e) => {{
-            if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Space', 'Home', 'End'].includes(e.code)) {{
-                releaseScroll();
-            }}
-        }}, {{ passive: true }});
-    }}, 1000);
-
-
-    function animateCounters() {{
-        const counters = document.querySelectorAll('.counter-value[data-target]');
-        if (!counters || !counters.length) return;
-
-        lockTop();
-
-        counters.forEach(counter => {{
-            const target = parseInt(counter.getAttribute('data-target'), 10) || 0;
-            if (counter._animating) return;
-            counter._animating = true;
-
-            if (target <= 1) {{
+            if (progress < 1) {{
+                requestAnimationFrame(step);
+            }} else {{
                 counter.textContent = target;
                 delete counter._animating;
-                return;
             }}
-
-            const startVal = 1;
-            const duration = 850; // fast, energetic ~0.85s count-up
-            const startTime = performance.now();
-
-            function step(currentTime) {{
-                const elapsed = currentTime - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                // Ease-out cubic: fast acceleration, smooth settle
-                const ease = 1 - Math.pow(1 - progress, 3);
-                const current = Math.floor(startVal + ease * (target - startVal));
-
-                counter.textContent = current;
-
-                if (progress < 1) {{
-                    requestAnimationFrame(step);
-                }} else {{
-                    counter.textContent = target;
-                    delete counter._animating;
-                    lockTop();
-                }}
-            }}
-
-            counter.textContent = startVal;
-            requestAnimationFrame(step);
-        }});
-    }}
-
-    animateCounters();
-    requestAnimationFrame(animateCounters);
-    setTimeout(animateCounters, 60);
+        }}
+        requestAnimationFrame(step);
+    }});
 }})();
 </script>
 """, unsafe_allow_javascript=True)
 
 # Get combined date filters for global use
-available_years, available_months = get_combined_date_filters(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df)
+available_years, available_months = get_combined_date_filters(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df)
 
 st.divider()
 
@@ -1389,7 +1380,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 if ticket_no:
     # Use master ticket system to track workflow
     ticket_data, current_status, workflow_info = get_ticket_workflow_status(
-        ticket_no, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, master_df
+        ticket_no, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, master_df
     )
     
     if current_status == "not_in_master":
@@ -1413,6 +1404,7 @@ if ticket_no:
         hold_match = hold_df[hold_df["Ticket Number"].str.upper() == ticket_no]
         open_match = open_df[open_df["Ticket Number"].str.upper() == ticket_no]
         pending_match = pending_df[pending_df["Ticket Number"].str.upper() == ticket_no]
+        pending_change_match = pending_change_df[pending_change_df["Ticket Number"].str.upper() == ticket_no] if pending_change_df is not None and not pending_change_df.empty else pd.DataFrame()
         closed_match = closed_df[closed_df["Ticket Number"].str.upper() == ticket_no]
 
         st.markdown("### 📊 Status Tracking Across All Categories")
@@ -1450,6 +1442,10 @@ if ticket_no:
                 <div class="status-card {'status-found' if not pending_match.empty else 'status-not-found'}">
                     <h4 style="margin-bottom: 0.5rem;">{'✅' if not pending_match.empty else '❌'} Pending</h4>
                     <p style="margin: 0;">{'Found' if not pending_match.empty else 'Not Found'}</p>
+                </div>
+                <div class="status-card {'status-found' if not pending_change_match.empty else 'status-not-found'}">
+                    <h4 style="margin-bottom: 0.5rem;">{'✅' if not pending_change_match.empty else '❌'} Pending Change</h4>
+                    <p style="margin: 0;">{'Found' if not pending_change_match.empty else 'Not Found'}</p>
                 </div>
                 <div class="status-card {'status-found' if not closed_match.empty else 'status-not-found'}">
                     <h4 style="margin-bottom: 0.5rem;">{'✅' if not closed_match.empty else '❌'} Closed</h4>
@@ -1494,13 +1490,16 @@ if ticket_no:
                 related_list(pending_df, owner, ticket_data["Ticket Number"],
                             "No other pending tickets for this owner.",
                             False, "🟠 Pending")
+                related_list(pending_change_df, owner, ticket_data["Ticket Number"],
+                            "No other pending change tickets for this owner.",
+                            False, "🔄 Pending Change")
 
 st.divider()
 
 # Enhanced filtering section
 st.markdown("### 🔍 Filter by Owner")
 all_owners: Set[str] = set()
-for df_item in [wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df]:
+for df_item in [wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df]:
     if df_item is not None and not df_item.empty and "Ticket Owner" in df_item.columns:
         all_owners.update(str(o) for o in df_item["Ticket Owner"].dropna().unique())
 all_owners_list = ["All owners"] + sorted(list(all_owners))
@@ -1519,9 +1518,10 @@ if selected_owner != "All owners":
     hold_user_count = len(hold_df[hold_df["Ticket Owner"] == selected_owner])
     open_user_count = len(open_df[open_df["Ticket Owner"] == selected_owner])
     pending_user_count = len(pending_df[pending_df["Ticket Owner"] == selected_owner])
+    pending_change_user_count = len(pending_change_df[pending_change_df["Ticket Owner"] == selected_owner]) if "Ticket Owner" in pending_change_df.columns else 0
     closed_user_count = len(closed_df[closed_df["Ticket Owner"] == selected_owner])
     
-    total_active_tickets = wip_user_count + dev_user_count + wait_user_count + hold_user_count + open_user_count + pending_user_count
+    total_active_tickets = wip_user_count + dev_user_count + wait_user_count + hold_user_count + open_user_count + pending_user_count + pending_change_user_count
     total_all_tickets = total_active_tickets + closed_user_count
     
     st.markdown(f"""
@@ -1554,6 +1554,10 @@ if selected_owner != "All owners":
                 <div class="stat-number animate-count">{pending_user_count}</div>
                 <div class="stat-label">Pending</div>
             </div>
+            <div class="user-stat-card" style="--border-color: #0284c7; --number-color: #0284c7;">
+                <div class="stat-number animate-count">{pending_change_user_count}</div>
+                <div class="stat-label">Pending Change</div>
+            </div>
             <div class="user-stat-card" style="--border-color: #6c757d; --number-color: #6c757d;">
                 <div class="stat-number animate-count">{closed_user_count}</div>
                 <div class="stat-label">Closed</div>
@@ -1574,6 +1578,8 @@ if selected_owner != "All owners":
             st.info(f"⏸️ **On Hold**: {selected_owner} has {hold_user_count} ticket(s) on hold - review for potential release.")
         if dev_user_count >= 5:
             st.info(f"💼 **High Workload**: {selected_owner} is actively working on {dev_user_count} tickets in development.")
+        if pending_change_user_count > 0:
+            st.info(f"🔄 **Pending Change**: {selected_owner} has {pending_change_user_count} ticket(s) awaiting change review/deployment.")
         if total_active_tickets >= 15:
             st.error(f"🚨 **Overloaded**: {selected_owner} has {total_active_tickets} total active tickets - consider redistributing workload.")
         if closed_user_count > 0:
@@ -1581,9 +1587,9 @@ if selected_owner != "All owners":
 
 st.divider()
 
-tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab_pc, tab7 = st.tabs([
     "📋 Master List", "📊 Work in Progress", "🔧 Under Development", "⚠️ Awaiting User Info", 
-    "⏸️ Hold", "🟢 Open", "🟠 Pending", "✅ Closed"
+    "⏸️ Hold", "🟢 Open", "🟠 Pending", "🔄 Pending Change", "✅ Closed"
 ])
 
 with tab0:
@@ -1608,7 +1614,7 @@ with tab0:
     display_filter_results(master_df, "Master List", master_owner_filter, master_year_filter, master_month_filter, "#17a2b8", creator_filter=master_creator_filter)
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, master_owner_filter, master_year_filter, master_month_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, master_owner_filter, master_year_filter, master_month_filter)
     
     # Filter and display data
     master_view = get_filtered_data(master_df, master_owner_filter, master_year_filter, master_month_filter, creator_filter=master_creator_filter)
@@ -1637,7 +1643,7 @@ with tab1:
     display_filter_results(wip_df, "Work in Progress", wip_owner_filter, wip_year_filter, wip_month_filter, "#007bff", creator_filter=wip_creator_filter)
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, wip_owner_filter, wip_year_filter, wip_month_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, wip_owner_filter, wip_year_filter, wip_month_filter)
     
     # Filter and display data
     wip_view = get_filtered_data(wip_df, wip_owner_filter, wip_year_filter, wip_month_filter, creator_filter=wip_creator_filter)
@@ -1665,7 +1671,7 @@ with tab2:
     display_filter_results(dev_df, "Under Development", dev_owner_filter, dev_year_filter, dev_month_filter, "#fd7e14", creator_filter=dev_creator_filter)
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, dev_owner_filter, dev_year_filter, dev_month_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, dev_owner_filter, dev_year_filter, dev_month_filter)
     
     # Filter and display data
     dev_view = get_filtered_data(dev_df, dev_owner_filter, dev_year_filter, dev_month_filter, creator_filter=dev_creator_filter)
@@ -1693,7 +1699,7 @@ with tab3:
     display_filter_results(wait_df, "Awaiting User Info", wait_owner_filter, wait_year_filter, wait_month_filter, "#dc3545", creator_filter=wait_creator_filter)
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, wait_owner_filter, wait_year_filter, wait_month_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, wait_owner_filter, wait_year_filter, wait_month_filter)
     
     wait_view = get_filtered_data(wait_df, wait_owner_filter, wait_year_filter, wait_month_filter, creator_filter=wait_creator_filter)
 
@@ -1769,8 +1775,11 @@ with tab3:
     matched_count = sum(1 for item in reminder_list if item["matched_email"])
     unmatched_count = len(reminder_list) - matched_count
 
-    # Load persistent sent reminder records from SQLite
-    sent_reminders_map = get_sent_reminders_map()
+    # Load persistent sent reminder records from SQLite (cached in session state for speed)
+    if "sent_reminders_map" not in st.session_state or st.session_state.get("_refresh_sent_reminders", False):
+        st.session_state["sent_reminders_map"] = get_sent_reminders_map()
+        st.session_state["_refresh_sent_reminders"] = False
+    sent_reminders_map = st.session_state["sent_reminders_map"]
     total_sent_in_db = len(sent_reminders_map)
 
     # Build creator groups
@@ -1788,20 +1797,21 @@ with tab3:
     # 📬 SENT MAILS HISTORY & LOGS (Prevents Overriding & Provides Full Visibility)
     # =========================================================================
     with st.expander(f"📬 Sent Reminders History ({total_sent_in_db} logged in SQLite)", expanded=False):
-        sent_df = get_sent_reminders_dataframe()
-        if not sent_df.empty:
-            st.markdown("Below is the persistent audit trail of all reminders sent. Each ticket is permanently logged so you won't duplicate or override sent notices.")
-            st.dataframe(sent_df, use_container_width=True, hide_index=True)
-            col_dl1, col_dl2 = st.columns([1, 3])
-            with col_dl1:
-                csv_sent = sent_df.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Export Sent Log (CSV)",
-                    data=csv_sent,
-                    file_name="sent_reminders_log.csv",
-                    mime="text/csv",
-                    key="btn_download_sent_log"
-                )
+        if total_sent_in_db > 0:
+            sent_df = get_sent_reminders_dataframe()
+            if not sent_df.empty:
+                st.markdown("Below is the persistent audit trail of all reminders sent. Each ticket is permanently logged so you won't duplicate or override sent notices.")
+                st.dataframe(sent_df, use_container_width=True, hide_index=True)
+                col_dl1, col_dl2 = st.columns([1, 3])
+                with col_dl1:
+                    csv_sent = sent_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Export Sent Log (CSV)",
+                        data=csv_sent,
+                        file_name="sent_reminders_log.csv",
+                        mime="text/csv",
+                        key="btn_download_sent_log"
+                    )
         else:
             st.info("No reminders sent yet. Once you send via Outlook or SMTP, the details will appear here automatically.")
 
@@ -2294,7 +2304,7 @@ with tab4:
     display_filter_results(hold_df, "Hold", hold_owner_filter, hold_year_filter, hold_month_filter, "#6f42c1", creator_filter=hold_creator_filter)
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, hold_owner_filter, hold_year_filter, hold_month_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, hold_owner_filter, hold_year_filter, hold_month_filter)
     
     # Filter and display data
     hold_view = get_filtered_data(hold_df, hold_owner_filter, hold_year_filter, hold_month_filter, creator_filter=hold_creator_filter)
@@ -2322,7 +2332,7 @@ with tab5:
     display_filter_results(open_df, "Open", open_owner_filter, open_year_filter, open_month_filter, "#28a745", creator_filter=open_creator_filter)
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, open_owner_filter, open_year_filter, open_month_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, open_owner_filter, open_year_filter, open_month_filter)
     
     # Filter and display data
     open_view = get_filtered_data(open_df, open_owner_filter, open_year_filter, open_month_filter, creator_filter=open_creator_filter)
@@ -2350,11 +2360,39 @@ with tab6:
     display_filter_results(pending_df, "Pending", pending_owner_filter, pending_year_filter, pending_month_filter, "#ffc107", creator_filter=pending_creator_filter)
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, pending_owner_filter, pending_year_filter, pending_month_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, pending_owner_filter, pending_year_filter, pending_month_filter)
     
     # Filter and display data
     pending_view = get_filtered_data(pending_df, pending_owner_filter, pending_year_filter, pending_month_filter, creator_filter=pending_creator_filter)
     st.dataframe(pending_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
+
+with tab_pc:
+    # Filters for Pending Change
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown('<div class="filter-label">Filter by Owner</div>', unsafe_allow_html=True)
+        pc_owners = ["All owners"] + (sorted(pending_change_df["Ticket Owner"].dropna().unique().tolist()) if "Ticket Owner" in pending_change_df.columns else [])
+        pending_change_owner_filter = st.selectbox("Pending Change Owner", pc_owners, key="pending_change_owner_filter", label_visibility="collapsed")
+    with col2:
+        st.markdown('<div class="filter-label">Filter by Creator</div>', unsafe_allow_html=True)
+        pc_creators = ["All creators"] + (sorted(pending_change_df["Ticket Creator"].dropna().unique().tolist()) if "Ticket Creator" in pending_change_df.columns else [])
+        pending_change_creator_filter = st.selectbox("Pending Change Creator", pc_creators, key="pending_change_creator_filter", label_visibility="collapsed")
+    with col3:
+        st.markdown('<div class="filter-label">Filter by Year</div>', unsafe_allow_html=True)
+        pending_change_year_filter = st.selectbox("Pending Change Year", available_years, key="pending_change_year_filter", label_visibility="collapsed")
+    with col4:
+        st.markdown('<div class="filter-label">Filter by Month</div>', unsafe_allow_html=True)
+        pending_change_month_filter = st.selectbox("Pending Change Month", available_months, key="pending_change_month_filter", label_visibility="collapsed")
+    
+    # Display prominent filter results
+    display_filter_results(pending_change_df, "Pending Change", pending_change_owner_filter, pending_change_year_filter, pending_change_month_filter, "#0284c7", creator_filter=pending_change_creator_filter)
+    
+    # Display user statistics if specific owner is selected
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, pending_change_owner_filter, pending_change_year_filter, pending_change_month_filter)
+    
+    # Filter and display data
+    pending_change_view = get_filtered_data(pending_change_df, pending_change_owner_filter, pending_change_year_filter, pending_change_month_filter, creator_filter=pending_change_creator_filter)
+    st.dataframe(pending_change_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 with tab7:
     # Filters for Closed
@@ -2378,13 +2416,13 @@ with tab7:
     display_filter_results(closed_df, "Closed", closed_owner_filter, closed_year_filter, closed_month_filter, "#6c757d", creator_filter=closed_creator_filter)
     
     # Display user statistics if specific owner is selected
-    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, closed_owner_filter, closed_year_filter, closed_month_filter)
+    display_user_statistics(wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, closed_owner_filter, closed_year_filter, closed_month_filter)
     
     # Filter and display data
     closed_view = get_filtered_data(closed_df, closed_owner_filter, closed_year_filter, closed_month_filter, creator_filter=closed_creator_filter)
     st.dataframe(closed_view.sort_values("Ticket Aging", ascending=False), use_container_width=True, hide_index=True)
 
 # ---------------------------------------------------------------- AI Assistant & Footer
-render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, closed_df, mail_to_df)
+render_chatbot_assistant(master_df, wip_df, dev_df, wait_df, hold_df, open_df, pending_df, pending_change_df, closed_df, mail_to_df)
 render_footer()
 

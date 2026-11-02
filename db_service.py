@@ -29,7 +29,7 @@ REQUIRED_COLS = [
     "Estimate Resolution Date", "Description",
 ]
 
-TABLE_KEYS = ["master", "wip", "dev", "wait", "hold", "open", "pending", "closed", "mail_to"]
+TABLE_KEYS = ["master", "wip", "dev", "wait", "hold", "open", "pending", "pending_change", "closed", "mail_to"]
 
 TABLE_NAME_MAP = {
     "master": "master_tickets",
@@ -39,6 +39,7 @@ TABLE_NAME_MAP = {
     "hold": "hold_tickets",
     "open": "open_tickets",
     "pending": "pending_tickets",
+    "pending_change": "pending_change_tickets",
     "closed": "closed_tickets",
     "mail_to": "mail_directory",
 }
@@ -51,28 +52,21 @@ EXCEL_FILE_NAMES = {
     "hold": "5_Hold_Tickets.xlsx",
     "open": "6_Open_Tickets.xlsx",
     "pending": "7_Pending_Tickets.xlsx",
-    "closed": "8_Closed_Tickets.xlsx",
-    "mail_to": "9_Mail_Directory_Mapping.xlsx",
+    "pending_change": "8_Pending_Change.xlsx",
+    "closed": "9_Closed_Tickets.xlsx",
+    "mail_to": "10_Mail_Directory_Mapping.xlsx",
 }
 
 
 def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
-    """Ensure directory exists and return an SQLite connection."""
+    """Ensure directory exists and return an optimized SQLite connection."""
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    conn = sqlite3.connect(db_path)
-    # Ensure sent_reminders log table always exists
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS sent_reminders (
-            ticket_number TEXT PRIMARY KEY,
-            creator_name TEXT,
-            recipient_email TEXT,
-            subject TEXT,
-            sent_by TEXT,
-            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            delivery_mode TEXT DEFAULT 'Outlook'
-        )
-    """)
-    conn.commit()
+    conn = sqlite3.connect(db_path, check_same_thread=False, timeout=15.0)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+    except Exception:
+        pass
     return conn
 
 
@@ -91,6 +85,17 @@ def record_sent_reminder(
     try:
         conn = get_connection(db_path)
         with conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS sent_reminders (
+                    ticket_number TEXT PRIMARY KEY,
+                    creator_name TEXT,
+                    recipient_email TEXT,
+                    subject TEXT,
+                    sent_by TEXT,
+                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    delivery_mode TEXT DEFAULT 'Outlook'
+                )
+            """)
             conn.execute("""
                 INSERT OR REPLACE INTO sent_reminders (
                     ticket_number, creator_name, recipient_email, subject, sent_by, sent_at, delivery_mode
@@ -481,6 +486,38 @@ def generate_seed_data() -> dict[str, pd.DataFrame]:
             "Description": "Right of way clearance permission pending with state road development corporation.",
         },
 
+        # --- Pending Change Tickets ---
+        {
+            "Ticket Number": "IT-2026-0168",
+            "Ticket Creator": "Vikram Malhotra",
+            "Subject": "ERP Schema Modification for Multi-Currency Invoice Export",
+            "Customer Name": "Finance & Accounts",
+            "Ticket Department": "ERP Support",
+            "Status": "Pending Change",
+            "Ticket Owner": "Sandeep Yadav",
+            "Ticket Priority": "High",
+            "Ticket Aging": 14,
+            "Start Date": "2026-09-14",
+            "Required Date": "2026-09-30",
+            "Estimate Resolution Date": "2026-10-08",
+            "Description": "Change request CR-882 submitted for database column addition and tax ledger mapping. Awaiting change advisory board review.",
+        },
+        {
+            "Ticket Number": "IT-2026-0170",
+            "Ticket Creator": "Pooja Nair",
+            "Subject": "Production Dispatch Barcode Format Revision for Export Shipments",
+            "Customer Name": "Supply Chain Logistics",
+            "Ticket Department": "Plant IT Operations",
+            "Status": "Pending Change",
+            "Ticket Owner": "Sneha Patel",
+            "Ticket Priority": "Medium",
+            "Ticket Aging": 9,
+            "Start Date": "2026-09-19",
+            "Required Date": "2026-10-02",
+            "Estimate Resolution Date": "2026-10-10",
+            "Description": "Customer requested GS1-128 compliance format change. Template update designed, awaiting final customer sign-off.",
+        },
+
         # --- Closed Tickets ---
         {
             "Ticket Number": "IT-2026-0171",
@@ -556,6 +593,7 @@ def generate_seed_data() -> dict[str, pd.DataFrame]:
     hold_df = pd.DataFrame(master_df[master_df["Status"] == "Hold"].copy().reset_index(drop=True))
     open_df = pd.DataFrame(master_df[master_df["Status"] == "Open"].copy().reset_index(drop=True))
     pending_df = pd.DataFrame(master_df[master_df["Status"] == "Pending"].copy().reset_index(drop=True))
+    pending_change_df = pd.DataFrame(master_df[master_df["Status"] == "Pending Change"].copy().reset_index(drop=True))
     closed_df = pd.DataFrame(master_df[master_df["Status"] == "Closed"].copy().reset_index(drop=True))
 
     # Mail Directory Mapping
@@ -582,6 +620,7 @@ def generate_seed_data() -> dict[str, pd.DataFrame]:
         "hold": hold_df,
         "open": open_df,
         "pending": pending_df,
+        "pending_change": pending_change_df,
         "closed": closed_df,
         "mail_to": mail_to_df,
     }
@@ -595,6 +634,20 @@ def init_database(force_reseed: bool = False, db_path: str = DB_PATH) -> bool:
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = get_connection(db_path)
     try:
+        # Ensure sent_reminders exists
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sent_reminders (
+                ticket_number TEXT PRIMARY KEY,
+                creator_name TEXT,
+                recipient_email TEXT,
+                subject TEXT,
+                sent_by TEXT,
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                delivery_mode TEXT DEFAULT 'Outlook'
+            )
+        """)
+        conn.commit()
+
         cursor = conn.cursor()
         # Check if master_tickets exists and has rows
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='master_tickets'")
@@ -635,6 +688,15 @@ def save_all_to_sqlite(
                 clean_df = df.copy()
                 clean_df.columns = [str(c).strip() for c in clean_df.columns]
                 clean_df.to_sql(table_name, conn, if_exists="replace", index=False)
+
+        # Create indexes on Ticket Number for fast lookup
+        for key in TABLE_KEYS:
+            if key != "mail_to":
+                tname = TABLE_NAME_MAP[key]
+                try:
+                    conn.execute(f'CREATE INDEX IF NOT EXISTS "idx_{tname}_num" ON "{tname}"("Ticket Number")')
+                except Exception:
+                    pass
 
         # Write metadata
         cursor = conn.cursor()
@@ -693,6 +755,9 @@ def load_all_from_sqlite(db_path: str = DB_PATH) -> dict[str, pd.DataFrame] | No
         core_keys = ["master", "wip", "dev", "wait", "hold", "open", "pending", "closed"]
         if any(result.get(k) is None or result[k].empty for k in core_keys):
             return None
+
+        if result.get("pending_change") is None:
+            result["pending_change"] = pd.DataFrame(columns=REQUIRED_COLS)
 
         return result
     except Exception as exc:  # noqa: BLE001

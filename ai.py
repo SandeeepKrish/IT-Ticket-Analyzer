@@ -118,6 +118,7 @@ def detect_file_type(filename: str) -> Optional[str]:
         (['awaiting', 'await', 'userinfo'], 'wait'),  # Matches "await", "awaiting", "awaiting_user_info", etc.
         (['hold'], 'hold'),
         (['open'], 'open'),
+        (['pendingchange', 'pending_change'], 'pending_change'),  # Must precede 'pending'
         (['pending'], 'pending'),
         (['closed', 'close'], 'closed'),  # Matches both "closed" and "close"
         (['mailto', 'mail_to', 'mail'], 'mail_to'),  # Matches "mailto", "mail_to", "mail"
@@ -158,6 +159,7 @@ def process_folder_upload(uploaded_files: List[Any]) -> Dict[str, Any]:
         'hold': None,
         'open': None,
         'pending': None,
+        'pending_change': None,
         'closed': None,
         'mail_to': None,
         'detected_files': [],
@@ -214,9 +216,15 @@ def validate_folder_upload(folder_result: Dict[str, Any]) -> Tuple[bool, str]:
     
     if missing_files:
         missing_display = ', '.join([key.upper() for key in missing_files])
-        return False, f"Missing ticket stage files for: {missing_display}. Please ensure all 8 ticket reports are included."
+        return False, f"Missing ticket stage files for: {missing_display}. Please ensure all ticket reports are included."
     
-    msg = "All 8 ticket workflow files loaded successfully!"
+    stage_count = 8
+    if folder_result.get('pending_change') is not None:
+        stage_count += 1
+        msg = f"All {stage_count} ticket workflow files (including 🔄 Pending Change) loaded successfully!"
+    else:
+        msg = "All 8 ticket workflow files loaded successfully!"
+
     if folder_result.get('mail_to') is not None:
         msg += f" (✉️ Mail Directory loaded with {len(folder_result['mail_to'])} contacts)"
     return True, msg
@@ -340,6 +348,7 @@ def generate_data_context(
     hold_df: Optional[pd.DataFrame] = None,
     open_df: Optional[pd.DataFrame] = None,
     pending_df: Optional[pd.DataFrame] = None,
+    pending_change_df: Optional[pd.DataFrame] = None,
     closed_df: Optional[pd.DataFrame] = None,
     mail_to_df: Optional[pd.DataFrame] = None,
 ) -> Dict[str, Any]:
@@ -352,6 +361,7 @@ def generate_data_context(
         'Hold': hold_df,
         'Open': open_df,
         'Pending': pending_df,
+        'Pending Change': pending_change_df,
         'Closed': closed_df,
         'Mail To Analysis': mail_to_df,
     }

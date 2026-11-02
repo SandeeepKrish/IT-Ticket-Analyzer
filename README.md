@@ -9,20 +9,20 @@ This platform streamlines support operations across 8 workflow stages, eliminate
 ## ✨ Key Features & Capabilities
 
 ### 1. 🔄 Multi-Stage Ticket Flow Tracking
-- **Complete Lifecycle Coverage**: Tracks tickets across **8 distinct categories**:
-  - `Master Ticket List`, `Open`, `Work In Progress (WIP)`, `Under Development`, `Awaiting User Info`, `On Hold`, `Pending`, and `Closed`.
+- **Complete Lifecycle Coverage**: Tracks tickets across **9 distinct categories**:
+  - `Master Ticket List`, `Open`, `Work In Progress (WIP)`, `Under Development`, `Awaiting User Info`, `On Hold`, `Pending`, `Pending Change`, and `Closed`.
 - **Cross-Queue Search**: Search any ticket number or creator to instantly view its live status and uncover every other open ticket associated with that owner.
 - **Workflow Process Visualizer**: Interactive diagram outlining ticket progression from creation to resolution.
 
 ### 2. 🗄️ Instant SQLite Demo Mode & Local Showcase
 - **Zero-File Quickstart**: Run and present the dashboard anywhere with a single click—no Excel files required.
-- **Embedded SQLite Storage**: Built-in `data/tickets.db` automatically seeds and stores complete 8-stage ticket workflows and mail directories.
+- **Embedded SQLite Storage**: Built-in `data/tickets.db` automatically seeds and stores complete 9-stage ticket workflows and mail directories.
 - **Save Uploads to Database**: Save your own uploaded Excel reports into SQLite as persistent datasets.
 - **Demo Files Folder**: Includes ready-to-use sample spreadsheets in `demo_files/` for demonstrating batch folder uploads.
 
 ### 3. 📁 Smart Batch / Folder Upload with Auto-Detection
 - **Single-Click Ingestion**: Upload all Excel files (`.xlsx`) at once in a single folder upload.
-- **Fuzzy Auto-Detection**: Automatically identifies and categorizes files using filename matching (e.g. `master`, `wip`, `dev`, `awaiting`, `hold`, `open`, `pending`, `closed`, and `mail_to`).
+- **Fuzzy Auto-Detection**: Automatically identifies and categorizes files using filename matching (e.g. `master`, `wip`, `dev`, `awaiting`, `hold`, `open`, `pending`, `pending_change`, `closed`, and `mail_to`).
 - **Validation & Summaries**: Live status indicators confirming all workflow files and directories are detected and validated before processing.
 
 ### 4. ✉️ Automated Mail Services & Follow-Up Reminders

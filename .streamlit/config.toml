@@ -5,3 +5,16 @@ backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f8fafc"
 textColor = "#1e293b"
 font = "sans serif"
+
+[server]
+fileWatcherType = "none"
+runOnSave = false
+enableCORS = false
+enableXsrfProtection = false
+maxUploadSize = 200
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"

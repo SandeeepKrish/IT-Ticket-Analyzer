@@ -17,8 +17,16 @@ import os
 import pandas as pd
 
 
+_cached_smtp_cfg: Optional[Dict[str, Any]] = None
+_email_lookup_cache: Dict[str, Optional[str]] = {}
+
+
 def get_smtp_env_config() -> Dict[str, Any]:
-    """Retrieve SMTP & Sender configuration across Streamlit secrets and environment variables."""
+    """Retrieve SMTP & Sender configuration across Streamlit secrets and environment variables (cached)."""
+    global _cached_smtp_cfg
+    if _cached_smtp_cfg is not None:
+        return dict(_cached_smtp_cfg)
+
     cfg = {
         "smtp_host": "smtp.blackbox.in",
         "smtp_port": 465,
@@ -78,6 +86,7 @@ def get_smtp_env_config() -> Dict[str, Any]:
     if os.environ.get("SENDER_PHONE"):
         cfg["sender_phone"] = os.environ.get("SENDER_PHONE", "").strip()
     
+    _cached_smtp_cfg = cfg
     return cfg
 
 
@@ -88,6 +97,8 @@ def build_email_directory(mail_to_df: Optional[pd.DataFrame]) -> Dict[str, str]:
     - Creator/Name: 'Ticket Creator', 'Name', 'User', 'Employee Name', etc.
     - Email: 'Email', 'Email ID', 'Mail', 'Mail ID', 'Mail To', etc.
     """
+    global _email_lookup_cache
+    _email_lookup_cache.clear()
     if mail_to_df is None or mail_to_df.empty:
         return {}
     
@@ -142,30 +153,37 @@ def build_email_directory(mail_to_df: Optional[pd.DataFrame]) -> Dict[str, str]:
 
 
 def find_creator_email(creator_name: str, directory: Dict[str, str]) -> Optional[str]:
-    """Find email for a creator name using exact, lowercase, or partial token matching."""
+    """Find email for a creator name using exact, lowercase, or partial token matching (memoized)."""
     if not creator_name or not directory:
         return None
         
     c_clean = creator_name.strip()
+    if c_clean in _email_lookup_cache:
+        return _email_lookup_cache[c_clean]
+
+    matched: Optional[str] = None
     if c_clean in directory:
-        return directory[c_clean]
-    if c_clean.lower() in directory:
-        return directory[c_clean.lower()]
-        
-    # Check partial matching (e.g., 'Sanket Tambe' matching 'Sanket' or 'sanket.tambe')
-    c_lower = c_clean.lower()
-    for key, email in directory.items():
-        if key and len(key) >= 3:
-            if key in c_lower or c_lower in key:
-                return email
+        matched = directory[c_clean]
+    elif c_clean.lower() in directory:
+        matched = directory[c_clean.lower()]
+    else:
+        # Check partial matching (e.g., 'Sanket Tambe' matching 'Sanket' or 'sanket.tambe')
+        c_lower = c_clean.lower()
+        for key, email in directory.items():
+            if key and len(key) >= 3 and (key in c_lower or c_lower in key):
+                matched = email
+                break
                 
-    # Token check
-    tokens = [t for t in c_lower.replace('.', ' ').split() if len(t) >= 3]
-    for key, email in directory.items():
-        if any(tok in key for tok in tokens):
-            return email
-            
-    return None
+        if not matched:
+            # Token check
+            tokens = [t for t in c_lower.replace('.', ' ').split() if len(t) >= 3]
+            for key, email in directory.items():
+                if any(tok in key for tok in tokens):
+                    matched = email
+                    break
+
+    _email_lookup_cache[c_clean] = matched
+    return matched
 
 
 def generate_reminder_email(
